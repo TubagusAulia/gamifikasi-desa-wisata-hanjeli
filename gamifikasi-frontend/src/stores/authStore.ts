@@ -1,0 +1,74 @@
+import { create } from 'zustand';
+import type { User, LoginCredentials, RegisterPayload } from '@/types';
+import { storage } from '@/utils/storage';
+import { authApi } from '@/services/api';
+import { socketService } from '@/services/socket';
+
+interface AuthState {
+  user: User | null;
+  token: string | null;
+  isLoading: boolean;
+  error: string | null;
+  login: (creds: LoginCredentials) => Promise<void>;
+  register: (payload: RegisterPayload) => Promise<void>;
+  loadSession: () => void;
+  logout: () => void;
+  clearError: () => void;
+}
+
+export const useAuthStore = create<AuthState>((set, get) => ({
+  user: storage.get<User>('user'),
+  token: storage.get<string>('token'),
+  isLoading: false,
+  error: null,
+
+  async login(creds) {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authApi.login(creds);
+      storage.set('token', res.token);
+      storage.set('user', res.user);
+      socketService.connect(res.token);
+      set({ user: res.user, token: res.token, isLoading: false });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Login gagal';
+      set({ isLoading: false, error: msg });
+      throw err;
+    }
+  },
+
+  async register(payload) {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authApi.register(payload);
+      storage.set('token', res.token);
+      storage.set('user', res.user);
+      socketService.connect(res.token);
+      set({ user: res.user, token: res.token, isLoading: false });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Registrasi gagal';
+      set({ isLoading: false, error: msg });
+      throw err;
+    }
+  },
+
+  loadSession() {
+    const token = storage.get<string>('token');
+    const user = storage.get<User>('user');
+    if (token && user) {
+      set({ token, user });
+      socketService.connect(token);
+    }
+  },
+
+  logout() {
+    socketService.disconnect();
+    storage.remove('token');
+    storage.remove('user');
+    set({ user: null, token: null });
+  },
+
+  clearError() {
+    set({ error: null });
+  },
+}));

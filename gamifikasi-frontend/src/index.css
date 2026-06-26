@@ -1,0 +1,170 @@
+@import "tailwindcss";
+
+/* Leaflet essential styles - prevent Tailwind reset from breaking the map */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  position: relative;
+  z-index: 0;
+  background: #f0f0f0;
+}
+
+/* User location marker pulse animation */
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(25,118,210,0.4); }
+  70% { box-shadow: 0 0 0 12px rgba(25,118,210,0); }
+  100% { box-shadow: 0 0 0 0 rgba(25,118,210,0); }
+}
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container {
+  position: absolute;
+}
+.leaflet-tile-pane {
+  z-index: 1;
+}
+.leaflet-overlay-pane {
+  z-index: 2;
+}
+.leaflet-marker-pane {
+  z-index: 3;
+}
+.leaflet-popup-pane {
+  z-index: 4;
+}
+.leaflet-control {
+  z-index: 5;
+}
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 6;
+}
+
+@theme {
+  /* === BRAND COLORS === */
+  /* Primary: Green — used for key brand elements, active states, primary actions */
+  --color-primary: #4CAF50;
+  --color-primary-light: #66BB6A;
+  --color-primary-dark: #388E3C;
+  --color-primary-50: #E8F5E9;
+
+  /* Secondary: Blue — used for supporting elements, links, secondary actions */
+  --color-secondary: #1976D2;
+  --color-secondary-light: #42A5F5;
+  --color-secondary-dark: #0D47A1;
+  --color-secondary-50: #E3F2FD;
+
+  /* Accent: Orange — used for CTAs, highlights, badges, emphasis */
+  --color-accent: #FF9800;
+  --color-accent-light: #FFB74D;
+  --color-accent-dark: #F57C00;
+  --color-accent-50: #FFF3E0;
+
+  /* === FUNCTIONAL COLORS === */
+  /* Success: Green — distinct from primary, indicates success/activation/completion */
+  --color-success: #22C55E;
+  --color-success-light: #4ADE80;
+  --color-success-dark: #16A34A;
+  --color-success-50: #F0FDF4;
+
+  /* Warning: Amber — indicates caution, pending states */
+  --color-warning: #F59E0B;
+  --color-warning-light: #FBBF24;
+  --color-warning-dark: #D97706;
+  --color-warning-50: #FFFBEB;
+
+  /* Danger: Red — indicates errors, destructive actions */
+  --color-danger: #EF4444;
+  --color-danger-light: #F87171;
+  --color-danger-dark: #DC2626;
+  --color-danger-50: #FEF2F2;
+
+  /* === SURFACE COLORS === */
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #F8FAFC;
+  --color-surface-hover: #F1F5F9;
+  --color-border: #E2E8F0;
+  --color-border-light: #F1F5F9;
+
+  /* === TEXT COLORS === */
+  --color-text: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
+
+  /* === TYPOGRAPHY === */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-text font-sans antialiased;
+    margin: 0;
+  }
+}
+
+@layer components {
+  /* === BUTTONS === */
+  .btn-primary {
+    @apply bg-primary text-white px-4 py-2.5 rounded-lg font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
+  }
+  .btn-secondary {
+    @apply bg-secondary text-white px-4 py-2.5 rounded-lg font-medium hover:bg-secondary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
+  }
+  .btn-accent {
+    @apply bg-accent text-white px-4 py-2.5 rounded-lg font-medium hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
+  }
+  .btn-outline {
+    @apply border-2 border-primary text-primary px-4 py-2.5 rounded-lg font-medium hover:bg-primary hover:text-white transition-colors;
+  }
+  .btn-ghost {
+    @apply text-text-muted px-3 py-2 rounded-lg font-medium hover:bg-surface-hover hover:text-text transition-colors;
+  }
+  .btn-success {
+    @apply bg-success text-white px-4 py-2.5 rounded-lg font-medium hover:bg-success-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
+  }
+  .btn-danger {
+    @apply bg-danger text-white px-4 py-2.5 rounded-lg font-medium hover:bg-danger-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
+  }
+
+  /* === CARDS === */
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-border p-5;
+  }
+  .card-hover {
+    @apply bg-white rounded-xl shadow-sm border border-border p-5 hover:shadow-md hover:border-primary/30 transition-all;
+  }
+
+  /* === INPUTS === */
+  .input-field {
+    @apply w-full px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all bg-white text-text;
+  }
+
+  /* === BADGES === */
+  .badge-primary {
+    @apply px-2.5 py-0.5 bg-primary-50 text-primary-dark text-xs font-medium rounded-full;
+  }
+  .badge-secondary {
+    @apply px-2.5 py-0.5 bg-secondary-50 text-secondary-dark text-xs font-medium rounded-full;
+  }
+  .badge-accent {
+    @apply px-2.5 py-0.5 bg-accent-50 text-accent-dark text-xs font-medium rounded-full;
+  }
+  .badge-success {
+    @apply px-2.5 py-0.5 bg-success-50 text-success-dark text-xs font-medium rounded-full;
+  }
+  .badge-warning {
+    @apply px-2.5 py-0.5 bg-warning-50 text-warning-dark text-xs font-medium rounded-full;
+  }
+  .badge-danger {
+    @apply px-2.5 py-0.5 bg-danger-50 text-danger-dark text-xs font-medium rounded-full;
+  }
+}
+
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.75rem;
+  z-index: 0;
+}
