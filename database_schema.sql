@@ -58,6 +58,7 @@ CREATE TABLE quiz (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nama VARCHAR(255) NOT NULL,
   deskripsi TEXT,
+  no_phone_policy TINYINT(1) DEFAULT 0,
   status ENUM('active', 'inactive') DEFAULT 'active',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -72,6 +73,18 @@ CREATE TABLE quiz_kelompok (
   FOREIGN KEY (quiz_id) REFERENCES quiz(id) ON DELETE CASCADE,
   FOREIGN KEY (kelompok_id) REFERENCES kelompok(id) ON DELETE CASCADE,
   UNIQUE KEY unique_quiz_kelompok (quiz_id, kelompok_id)
+) ENGINE=InnoDB;
+
+-- =====================================================
+-- TABEL: quiz_worker (which worker users are assigned to a quiz/agenda)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS quiz_worker (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quiz_id INT NOT NULL,
+  peserta_id INT NOT NULL,
+  FOREIGN KEY (quiz_id) REFERENCES quiz(id) ON DELETE CASCADE,
+  FOREIGN KEY (peserta_id) REFERENCES peserta(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_quiz_worker (quiz_id, peserta_id)
 ) ENGINE=InnoDB;
 
 -- =====================================================
@@ -116,6 +129,8 @@ CREATE TABLE sesi (
   waktu_mulai DATETIME,
   waktu_selesai DATETIME,
   status ENUM('inactive', 'active', 'completed') DEFAULT 'inactive',
+  password VARCHAR(255) DEFAULT NULL,
+  leaderboard JSON DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (quiz_id) REFERENCES quiz(id) ON DELETE CASCADE,
   FOREIGN KEY (daftar_soal_id) REFERENCES daftar_soal(id) ON DELETE CASCADE,
@@ -124,41 +139,7 @@ CREATE TABLE sesi (
   INDEX idx_status (status)
 ) ENGINE=InnoDB;
 
--- =====================================================
--- TABEL: jawaban (quiz answers - individual)
--- =====================================================
-CREATE TABLE jawaban (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  peserta_id INT NOT NULL,
-  sesi_id INT NOT NULL,
-  soal_id INT NOT NULL,
-  jawaban VARCHAR(255),
-  benar BOOLEAN DEFAULT 0,
-  skor INT DEFAULT 0,
-  submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (peserta_id) REFERENCES peserta(id) ON DELETE CASCADE,
-  FOREIGN KEY (sesi_id) REFERENCES sesi(id) ON DELETE CASCADE,
-  FOREIGN KEY (soal_id) REFERENCES soal(id) ON DELETE CASCADE,
-  INDEX idx_peserta_sesi (peserta_id, sesi_id)
-) ENGINE=InnoDB;
-
--- =====================================================
--- TABEL: kelompok_answer (for kelompok quiz type)
--- Pekerja inputs: which peserta answered correctly
--- =====================================================
-CREATE TABLE kelompok_answer (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  sesi_id INT NOT NULL,
-  kelompok_id INT NOT NULL,
-  soal_id INT NOT NULL,
-  peserta_id INT NOT NULL,
-  answered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (sesi_id) REFERENCES sesi(id) ON DELETE CASCADE,
-  FOREIGN KEY (kelompok_id) REFERENCES kelompok(id) ON DELETE CASCADE,
-  FOREIGN KEY (soal_id) REFERENCES soal(id) ON DELETE CASCADE,
-  FOREIGN KEY (peserta_id) REFERENCES peserta(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_answer (sesi_id, soal_id)
-) ENGINE=InnoDB;
+-- leaderboard JSON is stored directly on sesi table (added below)
 
 -- =====================================================
 -- TABEL: review (photo submission activity)

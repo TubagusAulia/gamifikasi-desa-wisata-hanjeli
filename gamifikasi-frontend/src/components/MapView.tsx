@@ -64,7 +64,7 @@ export function MapView({
             key={pos.id}
             center={[pos.latitude, pos.longitude]}
             radius={pos.radius_meter}
-            pathOptions={{ color: '#5591CD', fillColor: '#5591CD', fillOpacity: 0.12 }}
+            pathOptions={{ color: '#4ade80', fillColor: '#4ade80', fillOpacity: 0.15 }}
           />
         ))}
 

@@ -11,9 +11,7 @@ export function LeaderboardPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchLeaderboard = async () => {
-    if (type === 'sesi') {
-      return leaderboardApi.getSesi(entityId);
-    } else if (type === 'quiz') {
+    if (type === 'quiz') {
       return leaderboardApi.getQuiz(entityId);
     } else if (type === 'review') {
       return leaderboardApi.getReview(entityId);
@@ -31,14 +29,12 @@ export function LeaderboardPage() {
   const isKelompokType = type === 'review';
 
   const getBackLink = () => {
-    if (type === 'sesi') return `/sesi/${entityId}`;
     if (type === 'quiz') return `/quiz/${entityId}`;
     if (type === 'review') return `/review/${entityId}`;
     return '/';
   };
 
   const getTitle = () => {
-    if (type === 'sesi') return 'Leaderboard Sesi';
     if (type === 'quiz') return 'Leaderboard Quiz';
     if (type === 'review') return 'Leaderboard Review';
     return 'Leaderboard';

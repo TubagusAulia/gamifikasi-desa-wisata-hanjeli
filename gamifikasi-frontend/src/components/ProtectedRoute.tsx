@@ -15,7 +15,11 @@ export function ProtectedRoute({ children, roles }: Props) {
   }
 
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
+    // Redirect to the appropriate default page based on role
+    if (user.role === 'peserta' || user.role === 'worker') {
+      return <Navigate to="/peta" replace />;
+    }
+    return <Navigate to="/kelompok" replace />;
   }
 
   return <>{children}</>;

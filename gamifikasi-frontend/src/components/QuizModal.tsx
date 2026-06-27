@@ -4,13 +4,13 @@ import type { Soal } from '@/types';
 
 interface Props {
   soalList: Soal[];
-  sesiNama: string;
+  quizNama: string;
   posNama: string;
   onClose: () => void;
   onSubmit: (answers: { soal_id: number; jawaban: string }[]) => Promise<void>;
 }
 
-export function QuizModal({ soalList, sesiNama, posNama, onClose, onSubmit }: Props) {
+export function QuizModal({ soalList, quizNama, posNama, onClose, onSubmit }: Props) {
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -48,7 +48,7 @@ export function QuizModal({ soalList, sesiNama, posNama, onClose, onSubmit }: Pr
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div>
-            <h3 className="font-bold text-text">{sesiNama}</h3>
+            <h3 className="font-bold text-text">{quizNama}</h3>
             <p className="text-xs text-text-muted">{posNama}</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-hover">

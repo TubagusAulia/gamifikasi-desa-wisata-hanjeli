@@ -1,15 +1,16 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, X, Camera, Image as ImageIcon } from 'lucide-react';
+import { photoApi } from '@/services/api';
 
 interface Props {
-  reviewId: number;
-  kelompokId: number;
-  posId: number;
-  onUploaded?: () => void;
+  readonly sesiId: number;
+  readonly pesertaId: number;
+  readonly lokasiPosId: number;
+  readonly onUploaded?: () => void;
 }
 
-export function PhotoUploader({ reviewId, kelompokId, posId, onUploaded }: Props) {
+export function PhotoUploader({ sesiId, pesertaId, lokasiPosId, onUploaded }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
@@ -53,13 +54,15 @@ export function PhotoUploader({ reviewId, kelompokId, posId, onUploaded }: Props
     setUploading(true);
     setError(null);
     try {
-      const { reviewApi } = await import('@/services/api');
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('kelompok_id', String(kelompokId));
-      formData.append('pos_id', String(posId));
-      formData.append('caption', caption);
-      await reviewApi.upload(reviewId, formData);
+      formData.append('peserta_id', String(pesertaId));
+      formData.append('sesi_id', String(sesiId));
+      formData.append('lokasi_pos_id', String(lokasiPosId));
+      if (caption) {
+        formData.append('caption', caption);
+      }
+      await photoApi.upload(formData);
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
@@ -131,8 +134,9 @@ export function PhotoUploader({ reviewId, kelompokId, posId, onUploaded }: Props
       {file && (
         <>
           <div>
-            <label className="block text-sm font-medium text-text mb-1">Caption</label>
+            <label htmlFor="photo-caption" className="block text-sm font-medium text-text mb-1">Caption</label>
             <textarea
+              id="photo-caption"
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               placeholder="Tambahkan caption..."

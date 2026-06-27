@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
+const { generatePesertaPassword, generateQuizPassword } = require('./utils/password');
 
 async function seed() {
   console.log('[Seeder] Starting database seed...\n');
@@ -53,11 +54,16 @@ async function seed() {
   try {
     await conn.beginTransaction();
 
+    // Ensure no_phone_policy column exists (for older schemas)
+    try { await conn.query('ALTER TABLE quiz ADD COLUMN no_phone_policy TINYINT(1) DEFAULT 0'); } catch { /* column already exists */ }
+    // Ensure password column exists in sesi (for older schemas)
+    try { await conn.query('ALTER TABLE sesi ADD COLUMN password VARCHAR(255) DEFAULT NULL'); } catch { /* column already exists */ }
+
     // Clear existing data
     console.log('[Seeder] Clearing existing data...');
     await conn.query('SET FOREIGN_KEY_CHECKS = 0');
     const tablesToTruncate = [
-      'kelompok_answer', 'jawaban', 'review_submission', 'review_kelompok', 'review',
+      'review_submission', 'review_kelompok', 'review',
       'lokasi_peserta', 'geofence_event', 'submission_aktivitas', 'progress_peserta',
       'activity_gallery', 'soal', 'daftar_soal', 'sesi', 'quiz_kelompok', 'quiz',
       'pos', 'peserta', 'kelompok'
@@ -89,59 +95,61 @@ async function seed() {
     // PESERTA (5 per kelompok + admin + worker)
     // =====================================================
     console.log('[Seeder] Creating peserta...');
-    const passwordHash = await bcrypt.hash('password123', 10);
 
     const pesertaData = [
-      { nama: 'Admin Desa Wisata', email: 'admin@hanjeli.com', role: 'admin', kelompok_id: null },
-      { nama: 'Worker Pos', email: 'worker@hanjeli.com', role: 'worker', kelompok_id: null },
+      { nama: 'Admin 1', email: 'admin1@admin', role: 'admin', kelompok_id: null, password: 'admin' },
+      { nama: 'Admin 2', email: 'admin2@admin', role: 'admin', kelompok_id: null, password: 'admin' },
+      { nama: 'Pekerja 1', email: 'pekerja1@pekerja', role: 'worker', kelompok_id: null, password: 'pekerja' },
+      { nama: 'Pekerja 2', email: 'pekerja2@pekerja', role: 'worker', kelompok_id: null, password: 'pekerja' },
       // Wisata SMK Telkom (kelompokIds[0])
-      { nama: 'Rizky Aditya', email: 'rizky@smktelkom.com', role: 'peserta', kelompok_id: kelompokIds[0] },
-      { nama: 'Salsabila Putri', email: 'salsa@smktelkom.com', role: 'peserta', kelompok_id: kelompokIds[0] },
-      { nama: 'Fajar Nugroho', email: 'fajar@smktelkom.com', role: 'peserta', kelompok_id: kelompokIds[0] },
-      { nama: 'Nadia Rahma', email: 'nadia@smktelkom.com', role: 'peserta', kelompok_id: kelompokIds[0] },
-      { nama: 'Bayu Setiawan', email: 'bayu@smktelkom.com', role: 'peserta', kelompok_id: kelompokIds[0] },
+      { nama: 'Apel', email: 'apel@peserta', role: 'peserta', kelompok_id: kelompokIds[0], password: 'peserta' },
+      { nama: 'Mangga', email: 'mangga@peserta', role: 'peserta', kelompok_id: kelompokIds[0], password: 'peserta' },
+      { nama: 'Nanas', email: 'nanas@peserta', role: 'peserta', kelompok_id: kelompokIds[0], password: 'peserta' },
+      { nama: 'Nadia Rahma', email: 'nadia2@peserta', role: 'peserta', kelompok_id: kelompokIds[0], password: 'peserta' },
+      { nama: 'Bayu Setiawan', email: 'bayu2@peserta', role: 'peserta', kelompok_id: kelompokIds[0], password: 'peserta' },
       // TPLM Tel-U (kelompokIds[1])
-      { nama: 'Arief Wicaksono', email: 'arief@tplm.com', role: 'peserta', kelompok_id: kelompokIds[1] },
-      { nama: 'Dina Kartika', email: 'dina@tplm.com', role: 'peserta', kelompok_id: kelompokIds[1] },
-      { nama: 'Hendra Saputra', email: 'hendra@tplm.com', role: 'peserta', kelompok_id: kelompokIds[1] },
-      { nama: 'Indah Permata', email: 'indah@tplm.com', role: 'peserta', kelompok_id: kelompokIds[1] },
-      { nama: 'Joko Prasetyo', email: 'joko@tplm.com', role: 'peserta', kelompok_id: kelompokIds[1] },
+      { nama: 'Espresso', email: 'espresso@peserta', role: 'peserta', kelompok_id: kelompokIds[1], password: 'peserta' },
+      { nama: 'Mocca', email: 'mocca@peserta', role: 'peserta', kelompok_id: kelompokIds[1], password: 'peserta' },
+      { nama: 'Matcha', email: 'matcha@peserta', role: 'peserta', kelompok_id: kelompokIds[1], password: 'peserta' },
+      { nama: 'Indah Permata', email: 'indah2@peserta', role: 'peserta', kelompok_id: kelompokIds[1], password: 'peserta' },
+      { nama: 'Joko Prasetyo', email: 'joko2@peserta', role: 'peserta', kelompok_id: kelompokIds[1], password: 'peserta' },
       // KKN ITB (kelompokIds[2])
-      { nama: 'Kartika Dewi', email: 'kartika@kkn-itb.com', role: 'peserta', kelompok_id: kelompokIds[2] },
-      { nama: 'Lukman Hakim', email: 'lukman@kkn-itb.com', role: 'peserta', kelompok_id: kelompokIds[2] },
-      { nama: 'Maya Anggraini', email: 'maya@kkn-itb.com', role: 'peserta', kelompok_id: kelompokIds[2] },
-      { nama: 'Nanda Pratama', email: 'nanda@kkn-itb.com', role: 'peserta', kelompok_id: kelompokIds[2] },
-      { nama: 'Olivia Sari', email: 'olivia@kkn-itb.com', role: 'peserta', kelompok_id: kelompokIds[2] },
+      { nama: 'Kartika Dewi', email: 'kartika@peserta', role: 'peserta', kelompok_id: kelompokIds[2], password: 'peserta' },
+      { nama: 'Lukman Hakim', email: 'lukman@peserta', role: 'peserta', kelompok_id: kelompokIds[2], password: 'peserta' },
+      { nama: 'Maya Anggraini', email: 'maya@peserta', role: 'peserta', kelompok_id: kelompokIds[2], password: 'peserta' },
+      { nama: 'Nanda Pratama', email: 'nanda@peserta', role: 'peserta', kelompok_id: kelompokIds[2], password: 'peserta' },
+      { nama: 'Olivia Sari', email: 'olivia@peserta', role: 'peserta', kelompok_id: kelompokIds[2], password: 'peserta' },
       // Turis 30/6/2026 (kelompokIds[3])
-      { nama: 'Putra Ramadhan', email: 'putra@turis.com', role: 'peserta', kelompok_id: kelompokIds[3] },
-      { nama: 'Qori Handayani', email: 'qori@turis.com', role: 'peserta', kelompok_id: kelompokIds[3] },
-      { nama: 'Rina Susanti', email: 'rina@turis.com', role: 'peserta', kelompok_id: kelompokIds[3] },
-      { nama: 'Surya Darma', email: 'surya@turis.com', role: 'peserta', kelompok_id: kelompokIds[3] },
-      { nama: 'Tina Marlina', email: 'tina@turis.com', role: 'peserta', kelompok_id: kelompokIds[3] },
+      { nama: 'Putra Ramadhan', email: 'putra@peserta', role: 'peserta', kelompok_id: kelompokIds[3], password: 'peserta' },
+      { nama: 'Qori Handayani', email: 'qori@peserta', role: 'peserta', kelompok_id: kelompokIds[3], password: 'peserta' },
+      { nama: 'Rina Susanti', email: 'rina@peserta', role: 'peserta', kelompok_id: kelompokIds[3], password: 'peserta' },
+      { nama: 'Surya Darma', email: 'surya@peserta', role: 'peserta', kelompok_id: kelompokIds[3], password: 'peserta' },
+      { nama: 'Tina Marlina', email: 'tina@peserta', role: 'peserta', kelompok_id: kelompokIds[3], password: 'peserta' },
     ];
 
     const pesertaIds = [];
+    const pesertaPasswords = {};
     for (const p of pesertaData) {
+      const plainPassword = p.password || generatePesertaPassword();
+      const passwordHash = await bcrypt.hash(plainPassword, 10);
       const [result] = await conn.query(
         'INSERT INTO peserta (nama, email, password_hash, role, kelompok_id) VALUES (?, ?, ?, ?, ?)',
         [p.nama, p.email, passwordHash, p.role, p.kelompok_id]
       );
       pesertaIds.push(result.insertId);
+      pesertaPasswords[p.email] = plainPassword;
     }
-    console.log(`  ✓ Created ${pesertaIds.length} peserta (password: "password123")`);
+    console.log(`  ✓ Created ${pesertaIds.length} peserta`);
 
     // =====================================================
-    // POS
+    // POS (4 pos only)
     // =====================================================
     console.log('[Seeder] Creating pos...');
     const posData = [
-      { nama: 'Rumah Hanjeli', latitude: -6.9147, longitude: 107.6098, radius: 50, deskripsi: 'Pusat koordinasi dan edukasi hanjeli' },
-      { nama: 'Sawah Hanjeli', latitude: -6.9150, longitude: 107.6105, radius: 50, deskripsi: 'Area tanam dan panen hanjeli' },
-      { nama: 'Tumbuk & Nampih', latitude: -6.9145, longitude: 107.6110, radius: 50, deskripsi: 'Proses pascapanen tradisional' },
-      { nama: 'Panggang Rengginang', latitude: -6.9152, longitude: 107.6095, radius: 50, deskripsi: 'Produksi rengginang dan dodol' },
-      { nama: 'Toko Aksesoris', latitude: -6.9148, longitude: 107.6100, radius: 50, deskripsi: 'Pembuatan aksesoris dari biji hanjeli' },
-      { nama: 'Kebun Kopi', latitude: -6.9155, longitude: 107.6115, radius: 50, deskripsi: 'Perkebunan kopi arabika' },
-      { nama: 'Kebun Karet', latitude: -6.9142, longitude: 107.6090, radius: 50, deskripsi: 'Kebun karet dan pabrik sheet lateks' },
+      { nama: 'Rumah Hanjeli', latitude: -6.973455, longitude: 107.635876, radius: 100, deskripsi: 'Pusat koordinasi dan edukasi hanjeli' },
+      { nama: 'Sawah Hanjeli', latitude: -6.978330, longitude: 107.630174, radius: 100, deskripsi: 'Area tanam dan panen hanjeli' },
+      { nama: 'Tumbuk & Nampih', latitude: -6.969282, longitude: 107.628157, radius: 100, deskripsi: 'Proses pascapanen tradisional' },
+      { nama: 'Panggang Rengginang', latitude: -6.972959, longitude: 107.629641, radius: 100, deskripsi: 'Produksi rengginang dan dodol' },
     ];
 
     const posIds = [];
@@ -155,81 +163,53 @@ async function seed() {
     console.log(`  ✓ Created ${posIds.length} pos`);
 
     // =====================================================
-    // DAFTAR SOAL (1 per POS, semua kategori SMA)
+    // DAFTAR SOAL (4 daftar, 1 per POS — shared by all agendas)
     // =====================================================
     console.log('[Seeder] Creating daftar soal...');
-    const daftarSoalData = [
-      { nama: 'SMA POS 1 - Edukasi Hanjeli di Rumah Hanjeli', kategori: 'SMA' },
-      { nama: 'SMA POS 2 - Tanam dan Panen Hanjeli', kategori: 'SMA' },
-      { nama: 'SMA POS 3 - Tumbuk dan Nampih Hanjeli', kategori: 'SMA' },
-      { nama: 'SMA POS 4 - Rengginang Dodol Hanjeli', kategori: 'SMA' },
-      { nama: 'SMA POS 5 - Aksesoris Hanjeli', kategori: 'SMA' },
-      { nama: 'SMA POS 6 - Kebun Kopi', kategori: 'SMA' },
-      { nama: 'SMA POS 7 - Kebun Karet', kategori: 'SMA' },
-    ];
-    const daftarSoalIds = [];
-    for (const d of daftarSoalData) {
-      const [result] = await conn.query('INSERT INTO daftar_soal (nama, kategori) VALUES (?, ?)', [d.nama, d.kategori]);
+    const daftarSoalIds = []; // [posIdx] = id
+    for (let p = 0; p < 4; p++) {
+      const [result] = await conn.query(
+        'INSERT INTO daftar_soal (nama, kategori) VALUES (?, ?)',
+        [`Daftar Pertanyaan POS ${p + 1}`, 'SMA']
+      );
       daftarSoalIds.push(result.insertId);
     }
-    console.log(`  ✓ Created ${daftarSoalIds.length} daftar soal`);
+    console.log(`  ✓ Created ${daftarSoalIds.length} daftar soal (shared)`);
 
     // =====================================================
-    // SOAL (5 pertanyaan per POS / daftar soal)
+    // SOAL (4 per daftar soal)
     // =====================================================
     console.log('[Seeder] Creating soal...');
     const soalData = [
-      // POS 1: Edukasi Hanjeli di Rumah Hanjeli (daftarSoalIds[0])
-      { daftar_id: daftarSoalIds[0], opsi_a: 'Abah Asep Hidayat Mustopa', opsi_b: 'Bapak Hely Sugriwa', opsi_c: 'Rahmat Yusuf', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[0], opsi_a: 'Lebih rendah, yaitu hanya sekitar 4%', opsi_b: 'Hampir dua kali lipat, mencapai 14,5% - 15,8%', opsi_c: 'Sama persis, yaitu sebesar 8,8%', jawaban: 'B', poin: 1 },
-      { daftar_id: daftarSoalIds[0], opsi_a: 'Mantan pekerja migran (PMI) dan buruh penambang batu', opsi_b: 'Nelayan pesisir pantai selatan Sukabumi', opsi_c: 'Petani kelapa sawit skala industri', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[0], opsi_a: 'Kp. Cekdam Waluran RT 10/02, Desa Waluran Mandiri', opsi_b: 'Kp. Pasir Piring RT 05/01, Kecamatan Ciracap', opsi_c: 'Jl. Ciletuh Raya KM 12, Pelabuhanratu', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[0], opsi_a: 'Mengandung indeks glikemik tinggi dan sodium pekat', opsi_b: 'Memiliki indeks glikemik rendah dan tinggi kalsium', opsi_c: 'Mengandung senyawa gluten aktif pembakar lemak', jawaban: 'B', poin: 1 },
+      // POS 1: Rumah Hanjeli
+      { opsi_a: 'Abah Asep Hidayat Mustopa', opsi_b: 'Bapak Hely Sugriwa', opsi_c: 'Rahmat Yusuf', jawaban: 'A', poin: 1 },
+      { opsi_a: 'Lebih rendah, yaitu hanya sekitar 4%', opsi_b: 'Hampir dua kali lipat, mencapai 14,5% - 15,8%', opsi_c: 'Sama persis, yaitu sebesar 8,8%', jawaban: 'B', poin: 1 },
+      { opsi_a: 'Mantan pekerja migran (PMI) dan buruh penambang batu', opsi_b: 'Nelayan pesisir pantai selatan Sukabumi', opsi_c: 'Petani kelapa sawit skala industri', jawaban: 'A', poin: 1 },
+      { opsi_a: 'Kp. Cekdam Waluran RT 10/02, Desa Waluran Mandiri', opsi_b: 'Kp. Pasir Piring RT 05/01, Kecamatan Ciracap', opsi_c: 'Jl. Ciletuh Raya KM 12, Pelabuhanratu', jawaban: 'A', poin: 1 },
+      { opsi_a: 'Mengandung indeks glikemik tinggi dan sodium pekat', opsi_b: 'Memiliki indeks glikemik rendah dan tinggi kalsium', opsi_c: 'Mengandung senyawa gluten aktif pembakar lemak', jawaban: 'B', poin: 1 },
 
-      // POS 2: Tanam dan Panen Hanjeli (daftarSoalIds[1])
-      { daftar_id: daftarSoalIds[1], opsi_a: 'Sekitar 2 hingga 3 bulan saja', opsi_b: 'Sekitar 5 hingga 6 bulan lamanya', opsi_c: 'Lebih dari 12 bulan penuh', jawaban: 'B', poin: 1 },
-      { daftar_id: daftarSoalIds[1], opsi_a: 'Mengoptimalkan lahan dan menutup waktu tunggu panen yang lama', opsi_b: 'Mempercepat masa panen hanjeli menjadi hanya 1 bulan', opsi_c: 'Memenuhi syarat wajib sertifikasi ekspor internasional', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[1], opsi_a: 'Etem (ani-ani)', opsi_b: 'Lisung kayu', opsi_c: 'Rakel bambu', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[1], opsi_a: 'Direndam di dalam air panas bersuhu 50°C selama 24 - 48 jam', opsi_b: 'Dijemur di bawah terik matahari ekstrem selama 7 hari', opsi_c: 'Direndam cairan alkohol berkadar murni 96%', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[1], opsi_a: 'Faktor cuaca/iklim ekstrem dan hama babi hutan', opsi_b: 'Larangan resmi budidaya oleh pemerintah daerah', opsi_c: 'Hilangnya minat seluruh wisatawan domestik', jawaban: 'A', poin: 1 },
+      // POS 2: Sawah Hanjeli
+      { opsi_a: 'Sekitar 2 hingga 3 bulan saja', opsi_b: 'Sekitar 5 hingga 6 bulan lamanya', opsi_c: 'Lebih dari 12 bulan penuh', jawaban: 'B', poin: 1 },
+      { opsi_a: 'Mengoptimalkan lahan dan menutup waktu tunggu panen yang lama', opsi_b: 'Mempercepat masa panen hanjeli menjadi hanya 1 bulan', opsi_c: 'Memenuhi syarat wajib sertifikasi ekspor internasional', jawaban: 'A', poin: 1 },
+      { opsi_a: 'Etem (ani-ani)', opsi_b: 'Lisung kayu', opsi_c: 'Rakel bambu', jawaban: 'A', poin: 1 },
+      { opsi_a: 'Direndam di dalam air panas bersuhu 50°C selama 24 - 48 jam', opsi_b: 'Dijemur di bawah terik matahari ekstrem selama 7 hari', opsi_c: 'Direndam cairan alkohol berkadar murni 96%', jawaban: 'A', poin: 1 },
+      { opsi_a: 'Faktor cuaca/iklim ekstrem dan hama babi hutan', opsi_b: 'Larangan resmi budidaya oleh pemerintah daerah', opsi_c: 'Hilangnya minat seluruh wisatawan domestik', jawaban: 'A', poin: 1 },
 
-      // POS 3: Tumbuk dan Nampih Hanjeli (daftarSoalIds[2])
-      { daftar_id: daftarSoalIds[2], opsi_a: 'Lisung kayu panjang', opsi_b: 'Tampah bambu bundar', opsi_c: 'Boboko anyaman', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[2], opsi_a: 'Ngetok bulir', opsi_b: 'Nampih atau Menampi', opsi_c: 'Nyiram benih', jawaban: 'B', poin: 1 },
-      { daftar_id: daftarSoalIds[2], opsi_a: 'Pengeringan, pemecahan kulit luar, penyosohan aleuron, pemisahan dedak', opsi_b: 'Fermentasi ragi basah selama 3 minggu lalu direbus', opsi_c: 'Pembekuan cepat di dalam lemari es suhu sub-nol derajat', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[2], opsi_a: 'Pakan ternak berkualitas dan teh herbal seduh', opsi_b: 'Bahan baku pembuatan kertas dokumen resmi negara', opsi_c: 'Campuran aspal jalan raya ramah lingkungan', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[2], opsi_a: 'Kelompok Wanita Tani (KWT) Mekar Mandiri', opsi_b: 'Yayasan Cendikia Mulia Mandiri', opsi_c: 'Koperasi Gurandil Sejahtera', jawaban: 'A', poin: 1 },
+      // POS 3: Tumbuk & Nampih
+      { opsi_a: 'Lisung kayu panjang', opsi_b: 'Tampah bambu bundar', opsi_c: 'Boboko anyaman', jawaban: 'A', poin: 1 },
+      { opsi_a: 'Ngetok bulir', opsi_b: 'Nampih atau Menampi', opsi_c: 'Nyiram benih', jawaban: 'B', poin: 1 },
+      { opsi_a: 'Pengeringan, pemecahan kulit luar, penyosohan aleuron, pemisahan dedak', opsi_b: 'Fermentasi ragi basah selama 3 minggu lalu direbus', opsi_c: 'Pembekuan cepat di dalam lemari es suhu sub-nol derajat', jawaban: 'A', poin: 1 },
+      { opsi_a: 'Pakan ternak berkualitas dan teh herbal seduh', opsi_b: 'Bahan baku pembuatan kertas dokumen resmi negara', opsi_c: 'Campuran aspal jalan raya ramah lingkungan', jawaban: 'A', poin: 1 },
+      { opsi_a: 'Kelompok Wanita Tani (KWT) Mekar Mandiri', opsi_b: 'Yayasan Cendikia Mulia Mandiri', opsi_c: 'Koperasi Gurandil Sejahtera', jawaban: 'A', poin: 1 },
 
-      // POS 4: Rengginang Dodol Hanjeli (daftarSoalIds[3])
-      { daftar_id: daftarSoalIds[3], opsi_a: 'Kandungan zat glutennya lima kali lipat lebih rekat', opsi_b: 'Bebas gluten (gluten-free) secara alami dan bernutrisi tinggi', opsi_c: 'Memiliki warna hitam pekat alami tanpa pewarna', jawaban: 'B', poin: 1 },
-      { daftar_id: daftarSoalIds[3], opsi_a: 'Sekitar 10%', opsi_b: 'Sekitar 52%', opsi_c: 'Mencapai lebih dari 95%', jawaban: 'B', poin: 1 },
-      { daftar_id: daftarSoalIds[3], opsi_a: 'Rengginang, dodol, tape, dan wajit hanjeli', opsi_b: 'Bakpia, donat kentang, dan biskuit gandum', opsi_c: 'Mochi jepang dan kue lupis tepung ketan putih', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[3], opsi_a: 'Karakteristik teksturnya pulen dan lengket setelah dimasak', opsi_b: 'Sangat mudah hancur menjadi air jika dipanaskan', opsi_c: 'Memiliki aroma harum bunga mawar yang kuat', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[3], opsi_a: 'Chocochips, pizza, nastar, dan peanut cookies hanjeli', opsi_b: 'Macaron Perancis dan croissant mentega gurih', opsi_c: 'Bakpia kering panggang oven industri', jawaban: 'A', poin: 1 },
-
-      // POS 5: Aksesoris Hanjeli (daftarSoalIds[4])
-      { daftar_id: daftarSoalIds[4], opsi_a: 'Hanjeli Batu', opsi_b: 'Hanjeli Ketan', opsi_c: 'Hanjeli Kanyere', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[4], opsi_a: 'Warnanya tidak akan pudar dan mengkilap alami tanpa zat kimia', opsi_b: 'Dapat memancarkan cahaya terang di dalam kegelapan', opsi_c: 'Memiliki sifat elastis seperti karet setelah direbus', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[4], opsi_a: 'Gelang, kalung, tasbih, dan gantungan kunci', opsi_b: 'Sepatu kulit, kacamata hitam, dan topi anyaman daun kelapa', opsi_c: 'Bingkai foto kayu jati dan jam dinding otomatis', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[4], opsi_a: 'Gurandil', opsi_b: 'Etemers', opsi_c: 'Lisungers', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[4], opsi_a: 'Mesin laser Computer Numerical Control (CNC)', opsi_b: 'Mesin tenun Jacquard otomatis skala besar', opsi_c: 'Alat cetak tiup plastik bertekanan tinggi', jawaban: 'A', poin: 1 },
-
-      // POS 6: Kebun Kopi (daftarSoalIds[5])
-      { daftar_id: daftarSoalIds[5], opsi_a: 'Kopi Arabika (Arabica)', opsi_b: 'Kopi Robusta', opsi_c: 'Kopi Liberika', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[5], opsi_a: 'Menjaga mikroklimat ideal, kelembapan tanah, dan melindungi kopi dari terik matahari langsung', opsi_b: 'Mempercepat buah kopi matang secara instan dalam waktu satu minggu', opsi_c: 'Menghalangi masuknya hama babi hutan ke area perkebunan', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[5], opsi_a: 'Menjadi minuman fungsional kaya antioksidan bebas gluten dan kafein', opsi_b: 'Mengandung zat adiktif yang memicu kantuk instan', opsi_c: 'Meningkatkan kadar kolesterol jahat di dalam darah secara cepat', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[5], opsi_a: 'Mulai dari teknik penanaman bibit kopi hingga metode panen buah ceri', opsi_b: 'Teknik perakitan mesin espresso industri dari bahan bekas', opsi_c: 'Cara negosiasi ekspor kontainer kopi ke pasar Eropa', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[5], opsi_a: 'Batang pohon bambu dan batok kelapa', opsi_b: 'Serat daun pinus kering', opsi_c: 'Batuan basal hitam gunung api purba', jawaban: 'A', poin: 1 },
-
-      // POS 7: Kebun Karet (daftarSoalIds[6])
-      { daftar_id: daftarSoalIds[6], opsi_a: 'Teknik menggores/menyadap kulit batang pohon untuk mengambil getah', opsi_b: 'Teknik mencabut akar pohon karet tua menggunakan tali tambang', opsi_c: 'Metode penyulingan minyak atsiri dari daun pohon karet', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[6], opsi_a: 'Agar kulit pohon cepat mengelupas dan batang pohon cepat mengering', opsi_b: 'Untuk menjaga kesehatan pohon agar dapat memproduksi lateks secara berkelanjutan dalam jangka panjang', opsi_c: 'Supaya getah karet yang keluar langsung berubah menjadi padat di mangkuk', jawaban: 'B', poin: 1 },
-      { daftar_id: daftarSoalIds[6], opsi_a: 'Lembaran karet mentah setengah jadi (sheet latex)', opsi_b: 'Ban kendaraan balap formula berskala internasional', opsi_c: 'Benang karet elastis siap jahit untuk industri garmen', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[6], opsi_a: 'Lateks atau getah karet cair', opsi_b: 'Resin pinus murni', opsi_c: 'Kloroform nabati', jawaban: 'A', poin: 1 },
-      { daftar_id: daftarSoalIds[6], opsi_a: 'Kebun Teh Waluran', opsi_b: 'Perkebunan Kelapa Sawit', opsi_c: 'Hutan Lindung Pinus', jawaban: 'A', poin: 1 },
+      // POS 4: Panggang Rengginang
+      { opsi_a: 'Kandungan zat glutennya lima kali lipat lebih rekat', opsi_b: 'Bebas gluten (gluten-free) secara alami dan bernutrisi tinggi', opsi_c: 'Memiliki warna hitam pekat alami tanpa pewarna', jawaban: 'B', poin: 1 },
+      { opsi_a: 'Sekitar 10%', opsi_b: 'Sekitar 52%', opsi_c: 'Mencapai lebih dari 95%', jawaban: 'B', poin: 1 },
+      { opsi_a: 'Rengginang, dodol, tape, dan wajit hanjeli', opsi_b: 'Bakpia, donat kentang, dan biskuit gandum', opsi_c: 'Mochi jepang dan kue lupis tepung ketan putih', jawaban: 'A', poin: 1 },
+      { opsi_a: 'Karakteristik teksturnya pulen dan lengket setelah dimasak', opsi_b: 'Sangat mudah hancur menjadi air jika dipanaskan', opsi_c: 'Memiliki aroma harum bunga mawar yang kuat', jawaban: 'A', poin: 1 },
+      { opsi_a: 'Chocochips, pizza, nastar, dan peanut cookies hanjeli', opsi_b: 'Macaron Perancis dan croissant mentega gurih', opsi_c: 'Bakpia kering panggang oven industri', jawaban: 'A', poin: 1 },
     ];
 
-    // Map pertanyaan & penjelasan per daftar soal (POS)
     const pertanyaanMap = [
       // POS 1
       ['Siapakah tokoh pelopor sekaligus pendiri (founder) Yayasan Rumah Hanjeli Indonesia yang menginisiasi budidaya ini?',
@@ -255,24 +235,6 @@ async function seed() {
        'Jenis jajanan tradisional manis dan gurih apa saja yang diproduksi secara kolektif oleh warga dari beras hanjeli?',
        'Mengapa varietas Hanjeli Ketan lebih disukai sebagai bahan baku pembuatan rengginang dan dodol dibanding Hanjeli Batu?',
        'Produk kue kering inovatif non-pangan apa saja yang dilatihkan oleh akademisi UPI bagi para ibu eks-migran di Waluran?'],
-      // POS 5
-      ['Jenis varietas hanjeli apakah yang memiliki cangkang luar sangat keras mengkilap sehingga khusus dijadikan bahan baku aksesoris?',
-       'Apa kelebihan alami dari biji Hanjeli Batu saat diolah menjadi produk kerajinan gelang atau kalung?',
-       'Apa saja ragam produk aksesoris tangan kreatif yang dapat dirangkai langsung oleh wisatawan di stasiun edukasi ini?',
-       'Apa julukan lokal bagi para penambang emas liar tradisional di kawasan hutan Waluran sebelum berdirinya desa wisata?',
-       'Alat modern berbasis komputerisasi apa yang digunakan oleh kelompok pemuda kreatif desa untuk mengukir suvenir bambu?'],
-      // POS 6
-      ['Jenis komoditas kopi spesifik apakah yang ditanam dan diperkenalkan pemeliharaannya kepada wisatawan di kawasan kebun ini?',
-       'Apa fungsi utama dari penanaman pohon peneduh di sekitar tanaman kopi arabika yang dikembangkan di kawasan ini?',
-       'Apa penemuan ilmiah dari riset Fakultas Farmasi UI mengenai khasiat biji hanjeli yang disangrai menyerupai kopi?',
-       'Rentang materi budidaya hulu-hilir apa saja yang diajarkan oleh pemandu wisata saat berada di Kebun Kopi Hanjeli?',
-       'Selain kerajinan biji hanjeli, bahan alam ramah lingkungan apa yang diolah oleh divisi kreatif pemuda untuk teman minum kopi?'],
-      // POS 7
-      ['Keterampilan fisik apa yang diajarkan kepada wisatawan saat melakukan aktivitas praktik di kebun karet?',
-       'Mengapa proses penyadapan getah karet harus dilakukan secara hati-hati tanpa merusak lapisan kambium bagian dalam pohon?',
-       'Apa output produk setengah jadi yang dihasilkan oleh fasilitas pabrik pengolahan karet di Desa Wisata Hanjeli?',
-       'Apa nama zat cair pekat berwarna putih susu yang keluar dari kulit batang pohon karet setelah disayat menggunakan pisau khusus?',
-       'Dalam paket menginap (2 hari 1 malam), kunjungan ke Kebun Karet di hari kedua biasanya digabungkan dengan eduwisata ke...'],
     ];
 
     const penjelasanMap = [
@@ -300,89 +262,99 @@ async function seed() {
        'Olahan makanan ikonik desa ini meliputi produk renyah seperti rengginang, produk legit seperti dodol dan wajit, hingga tape fermentasi.',
        'Hanjeli ketan memiliki sifat gelatinisasi yang baik, menghasilkan tekstur liat dan lengket yang krusial untuk struktur dodol dan rengginang.',
        'Kolaborasi akademis melahirkan aneka resep kue kering (cookies) berbasis tepung hanjeli murni untuk diversifikasi oleh-oleh eduwisata.'],
-      // POS 5
-      ['Berbeda dari jenis ketan yang empuk, hanjeli batu bertekstur keras seperti batu mineral sehingga sangat ideal dirangkai menjadi manik-manik.',
-       'Permukaan luar cangkang hanjeli batu memiliki lapisan pelindung alami yang awet dan semakin mengkilap bila sering bergesekan dengan kulit.',
-       'Wisatawan diajarkan merangkai biji-biji hanjeli batu berlubang alami menjadi aksesoris estetis seperti gelang, kalung, dan untaian tasbih.',
-       'Istilah "Gurandil" merujuk pada warga lokal yang menambang emas secara ilegal dengan metode tradisional yang berisiko tinggi.',
-       'Penggunaan mesin laser CNC membantu pemuda lokal mengukir produk bambu seperti tumbler secara presisi, cepat, dan bernilai seni tinggi.'],
-      // POS 6
-      ['Wisatawan diajad berinteraksi langsung dengan pohon kopi jenis arabika yang dikembangkan secara organik di bawah naungan pohon peneduh.',
-       'Pohon peneduh sangat krusial dalam budidaya kopi arabika dataran menengah untuk mengontrol intensitas cahaya matahari dan menjaga kelembapan tanah agar kualitas ceri kopi optimal.',
-       'Biji hanjeli sangrai berkhasiat menghambat enzim alfa-glukosidase (anti-diabetes) serta menjadi alternatif pengganti kopi bebas kafein.',
-       'Wisatawan diajarkan siklus hidup pohon kopi, cara memilah buah kopi arabika matang pohon (cherry merah), hingga teknik pemetikan.',
-       'Divisi kreatif mengolah bambu dan batok kelapa menjadi cangkir, tumbler, dan suvenir pelengkap aktivitas minum kopi atau teh pengunjung.'],
-      // POS 7
-      ['Pengunjung diajak mempraktikkan penyadapan menggunakan pisau sadap melengkung guna mengalirkan lateks tanpa merusak kambium pohon.',
-       'Lapisan kambium adalah area pertumbuhan pohon. Jika kambium rusak akibat sayatan yang terlalu dalam, pohon akan mengalami cacat permanen (buku-buku) dan produksi getahnya akan terhenti.',
-       'Pabrik desa memproses lateks cair mentah dari perkebunan melalui proses koagulasi dan penggilingan hingga menjadi lembaran karet setengah jadi.',
-       'Cairan putih susu tersebut adalah lateks mentah, emulsi koloid yang mengandung partikel polimer karet alam berkerapatan tinggi.',
-       'Paket eduwisata menginap memadukan kunjungan ke kebun karet dan Kebun Teh Waluran sebagai aktivitas penutup sebelum wisatawan pulang.'],
     ];
 
     const soalIds = [];
-    for (let i = 0; i < soalData.length; i++) {
-      const s = soalData[i];
-      const daftarIndex = Math.floor(i / 5);
-      const soalIndex = i % 5;
-      const [result] = await conn.query(
-        'INSERT INTO soal (daftar_soal_id, pertanyaan, opsi_a, opsi_b, opsi_c, jawaban_benar, penjelasan_jawaban_benar, poin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [s.daftar_id, pertanyaanMap[daftarIndex][soalIndex], s.opsi_a, s.opsi_b, s.opsi_c, s.jawaban, penjelasanMap[daftarIndex][soalIndex], s.poin]
-      );
-      soalIds.push(result.insertId);
+    for (let p = 0; p < 4; p++) {
+      for (let s = 0; s < 5; s++) {
+        const soalIndex = p * 5 + s;
+        const [result] = await conn.query(
+          'INSERT INTO soal (daftar_soal_id, pertanyaan, opsi_a, opsi_b, opsi_c, jawaban_benar, penjelasan_jawaban_benar, poin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [daftarSoalIds[p], pertanyaanMap[p][s], soalData[soalIndex].opsi_a, soalData[soalIndex].opsi_b, soalData[soalIndex].opsi_c, soalData[soalIndex].jawaban, penjelasanMap[p][s], soalData[soalIndex].poin]
+        );
+        soalIds.push(result.insertId);
+      }
     }
     console.log(`  ✓ Created ${soalIds.length} soal`);
 
     // =====================================================
-    // QUIZ (1 per kelompok, all 7 POS as sesi)
+    // QUIZ (1 per kelompok, 4 sesi per quiz — 1 per pos)
     // =====================================================
     console.log('[Seeder] Creating quiz & sesi per kelompok...');
 
-    // Wisata SMK Telkom & KKN ITB = all kelompok type
-    // TPLM Tel-U & Turis 30/6/2026 = all individu type
+    // Wisata SMK Telkom & KKN ITB = kelompok type
+    // TPLM Tel-U & Turis 30/6/2026 = individu type
     const kelompokQuizConfig = [
-      { kelompokIdx: 0, quizNama: 'Quiz Wisata SMK Telkom', defaultTipe: 'kelompok' },
-      { kelompokIdx: 1, quizNama: 'Quiz TPLM Tel-U', defaultTipe: 'individu' },
-      { kelompokIdx: 2, quizNama: 'Quiz KKN ITB', defaultTipe: 'kelompok' },
-      { kelompokIdx: 3, quizNama: 'Quiz Turis 30/6/2026', defaultTipe: 'individu' },
+      { kelompokIdx: 0, quizNama: 'Agenda Wisata SMK Telkom', noPhonePolicy: true },
+      { kelompokIdx: 1, quizNama: 'Agenda TPLM Tel-U', noPhonePolicy: false },
+      { kelompokIdx: 2, quizNama: 'Agenda KKN ITB', noPhonePolicy: true },
+      { kelompokIdx: 3, quizNama: 'Agenda Turis 30/6/2026', noPhonePolicy: false },
     ];
 
-    const posNames = ['POS 1', 'POS 2', 'POS 3', 'POS 4', 'POS 5', 'POS 6', 'POS 7'];
-    const waktuMulai = ['08:00', '09:30', '11:00', '13:00', '14:30', '16:00', '17:30'];
-    const waktuSelesai = ['09:15', '10:45', '12:15', '14:15', '15:45', '17:15', '18:45'];
+    // Schedule dates for each agenda
+    const agendaDates = [
+      { start: '2026-06-26', end: '2026-07-26' }, // Wisata SMK Telkom
+      { start: '2026-07-01', end: '2026-08-01' }, // TPLM Tel-U
+      { start: '2026-07-05', end: '2026-08-05' }, // KKN ITB
+      { start: '2026-07-10', end: '2026-08-10' }, // Turis
+    ];
+    const waktuMulai = ['08:00', '10:00', '13:00', '15:00'];
+    const waktuSelesai = ['09:30', '11:30', '14:30', '16:30'];
 
     for (const config of kelompokQuizConfig) {
       const kid = kelompokIds[config.kelompokIdx];
       const kelNama = kelompokData[config.kelompokIdx];
+      const dates = agendaDates[config.kelompokIdx];
 
       // Create quiz for this kelompok
       const [quizResult] = await conn.query(
-        'INSERT INTO quiz (nama, deskripsi, status) VALUES (?, ?, ?)',
-        [config.quizNama, `Quiz untuk kelompok ${kelNama}`, 'active']
+        'INSERT INTO quiz (nama, deskripsi, no_phone_policy, status) VALUES (?, ?, ?, ?)',
+        [config.quizNama, `Agenda untuk kelompok ${kelNama}`, config.noPhonePolicy ? 1 : 0, 'active']
       );
       const quizId = quizResult.insertId;
 
       // Assign quiz to this kelompok only
       await conn.query('INSERT INTO quiz_kelompok (quiz_id, kelompok_id) VALUES (?, ?)', [quizId, kid]);
 
-      // Create 1 sesi per POS (7 sesi total)
-      for (let p = 0; p < 7; p++) {
+      // Create 1 sesi per POS (4 sesi total) — tipe auto-set by no_phone_policy
+      const tipeSesi = config.noPhonePolicy ? 'kelompok' : 'individu';
+      const quizPasswords = {};
+      for (let p = 0; p < 4; p++) {
+        const plainPassword = generateQuizPassword();
+        quizPasswords[`POS ${p + 1}`] = plainPassword;
         const [result] = await conn.query(
-          'INSERT INTO sesi (quiz_id, daftar_soal_id, pos_id, nama, tipe, waktu_mulai, waktu_selesai, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO sesi (quiz_id, daftar_soal_id, pos_id, nama, tipe, waktu_mulai, waktu_selesai, status, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             quizId,
             daftarSoalIds[p],
             posIds[p],
-            `${kelNama} ${posNames[p]}`,
-            config.defaultTipe,
-            `2026-06-26 ${waktuMulai[p]}:00`,
-            `2026-06-26 ${waktuSelesai[p]}:00`,
+            `${kelNama} POS ${p + 1}`,
+            tipeSesi,
+            `${dates.start} ${waktuMulai[p]}:00`,
+            `${dates.end} ${waktuSelesai[p]}:00`,
             p === 0 ? 'active' : 'inactive',
+            plainPassword,
           ]
         );
       }
 
-      console.log(`  ✓ Created quiz "${config.quizNama}" with 7 sesi (${config.defaultTipe})`);
+      console.log(`  ✓ Created quiz "${config.quizNama}" with 4 sesi (${config.noPhonePolicy ? 'No Phone' : 'Individu'}, ${dates.start} → ${dates.end})`);
+      console.log(`    Passwords: ${Object.entries(quizPasswords).map(([k, v]) => `${k}: ${v}`).join(' | ')}`);
+    }
+
+    // =====================================================
+    // ASSIGN DEMO WORKER TO SMK TELKOM QUIZ
+    // =====================================================
+    try {
+      const [[workerRow]] = await conn.query("SELECT id FROM peserta WHERE email = 'pekerja1@pekerja' LIMIT 1");
+      const [[smkQuiz]] = await conn.query("SELECT id FROM quiz WHERE nama = 'Agenda Wisata SMK Telkom' LIMIT 1");
+      if (workerRow && smkQuiz) {
+        await conn.query('CREATE TABLE IF NOT EXISTS quiz_worker (id INT AUTO_INCREMENT PRIMARY KEY, quiz_id INT NOT NULL, peserta_id INT NOT NULL, UNIQUE KEY uq (quiz_id, peserta_id))');
+        await conn.query('INSERT IGNORE INTO quiz_worker (quiz_id, peserta_id) VALUES (?, ?)', [smkQuiz.id, workerRow.id]);
+        console.log('  ✓ Assigned demo worker to Agenda Wisata SMK Telkom');
+      }
+    } catch (err) {
+      // ignore
     }
 
     // =====================================================
@@ -402,13 +374,36 @@ async function seed() {
     await conn.commit();
 
     console.log('\n✅ [Seeder] Database seeded successfully!');
-    console.log('\n--- Login Accounts (password: "password123") ---');
-    console.log('  Admin:  admin@hanjeli.com');
-    console.log('  Worker: worker@hanjeli.com');
-    console.log('  Wisata SMK Telkom: rizky@smktelkom.com | salsa@smktelkom.com | fajar@smktelkom.com | nadia@smktelkom.com | bayu@smktelkom.com');
-    console.log('  TPLM Tel-U: arief@tplm.com | dina@tplm.com | hendra@tplm.com | indah@tplm.com | joko@tplm.com');
-    console.log('  KKN ITB: kartika@kkn-itb.com | lukman@kkn-itb.com | maya@kkn-itb.com | nanda@kkn-itb.com | olivia@kkn-itb.com');
-    console.log('  Turis 30/6/2026: putra@turis.com | qori@turis.com | rina@turis.com | surya@turis.com | tina@turis.com');
+    console.log('\n--- Login Accounts ---');
+    console.log(`  Admin 1:  admin1@admin / ${pesertaPasswords['admin1@admin']}`);
+    console.log(`  Admin 2: admin2@admin / ${pesertaPasswords['admin2@admin']}`);
+    console.log('  Workers:');
+    console.log(`    pekerja1@pekerja / ${pesertaPasswords['pekerja1@pekerja']}`);
+    console.log(`    pekerja2@pekerja / ${pesertaPasswords['pekerja2@pekerja']}`);
+    console.log('  Wisata SMK Telkom:');
+    console.log(`    apel@peserta / ${pesertaPasswords['apel@peserta']}`);
+    console.log(`    mangga@peserta / ${pesertaPasswords['mangga@peserta']}`);
+    console.log(`    nanas@peserta / ${pesertaPasswords['nanas@peserta']}`);
+    console.log(`    nadia2@peserta / ${pesertaPasswords['nadia2@peserta']}`);
+    console.log(`    bayu2@peserta / ${pesertaPasswords['bayu2@peserta']}`);
+    console.log('  TPLM Tel-U:');
+    console.log(`    espresso@peserta / ${pesertaPasswords['espresso@peserta']}`);
+    console.log(`    mocca@peserta / ${pesertaPasswords['mocca@peserta']}`);
+    console.log(`    matcha@peserta / ${pesertaPasswords['matcha@peserta']}`);
+    console.log(`    indah2@peserta / ${pesertaPasswords['indah2@peserta']}`);
+    console.log(`    joko2@peserta / ${pesertaPasswords['joko2@peserta']}`);
+    console.log('  KKN ITB:');
+    console.log(`    kartika@peserta / ${pesertaPasswords['kartika@peserta']}`);
+    console.log(`    lukman@peserta / ${pesertaPasswords['lukman@peserta']}`);
+    console.log(`    maya@peserta / ${pesertaPasswords['maya@peserta']}`);
+    console.log(`    nanda@peserta / ${pesertaPasswords['nanda@peserta']}`);
+    console.log(`    olivia@peserta / ${pesertaPasswords['olivia@peserta']}`);
+    console.log('  Turis 30/6/2026:');
+    console.log(`    putra@peserta / ${pesertaPasswords['putra@peserta']}`);
+    console.log(`    qori@peserta / ${pesertaPasswords['qori@peserta']}`);
+    console.log(`    rina@peserta / ${pesertaPasswords['rina@peserta']}`);
+    console.log(`    surya@peserta / ${pesertaPasswords['surya@peserta']}`);
+    console.log(`    tina@peserta / ${pesertaPasswords['tina@peserta']}`);
 
   } catch (err) {
     await conn.rollback();

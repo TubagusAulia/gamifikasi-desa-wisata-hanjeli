@@ -15,12 +15,12 @@ const router = express.Router();
 router.get('/', authenticate, asyncHandler(async (req, res) => {
   const { role } = req.user;
 
-  let sql = 'SELECT id, nama, deskripsi, status, created_at FROM quiz';
+  let sql = 'SELECT id, nama, deskripsi, no_phone_policy, status, created_at FROM quiz';
   const params = [];
 
   if (role === 'peserta') {
     // Peserta only sees active quiz that their kelompok is assigned to
-    sql = `SELECT DISTINCT q.id, q.nama, q.deskripsi, q.status, q.created_at
+    sql = `SELECT DISTINCT q.id, q.nama, q.deskripsi, q.no_phone_policy, q.status, q.created_at
            FROM quiz q
            INNER JOIN quiz_kelompok qk ON q.id = qk.quiz_id
            WHERE q.status = ? AND qk.kelompok_id = ?`;
@@ -30,7 +30,44 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
   sql += ' ORDER BY id';
   const [rows] = await pool.execute(sql, params);
 
-  res.json({ success: true, data: rows });
+  // Fetch sesi for each quiz to build pos mapping
+  const quizIds = rows.map(r => r.id);
+  let sesiMap = {};
+  if (quizIds.length > 0) {
+    const placeholders = quizIds.map(() => '?').join(',');
+    const [sesiRows] = await pool.execute(
+      `SELECT id, quiz_id, pos_id, nama, tipe FROM sesi WHERE quiz_id IN (${placeholders})`,
+      quizIds
+    );
+    sesiRows.forEach(s => {
+      if (!sesiMap[s.quiz_id]) sesiMap[s.quiz_id] = [];
+      sesiMap[s.quiz_id].push(s);
+    });
+  }
+
+  // Attach sesi to each quiz
+  const data = rows.map(r => ({
+    ...r,
+    sesi: sesiMap[r.id] || [],
+  }));
+
+  // Attach assigned workers for each quiz
+  if (data.length > 0) {
+    const quizIds = data.map(d => d.id);
+    const placeholders = quizIds.map(() => '?').join(',');
+    const [workerRows] = await pool.execute(
+      `SELECT qw.quiz_id, p.id AS peserta_id, p.nama, p.email FROM quiz_worker qw INNER JOIN peserta p ON qw.peserta_id = p.id WHERE qw.quiz_id IN (${placeholders})`,
+      quizIds
+    );
+    const workerMap = {};
+    workerRows.forEach(w => {
+      if (!workerMap[w.quiz_id]) workerMap[w.quiz_id] = [];
+      workerMap[w.quiz_id].push({ id: w.peserta_id, nama: w.nama, email: w.email });
+    });
+    data.forEach(d => { d.assigned_workers = workerMap[d.id] || []; });
+  }
+
+  res.json({ success: true, data });
 }));
 
 /**
@@ -38,15 +75,15 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
  * Body: { nama, deskripsi?, kelompok_ids: number[] }
  */
 router.post('/', authenticate, authorize('admin'), validate(createQuizSchema), asyncHandler(async (req, res) => {
-  const { nama, deskripsi, kelompok_ids } = req.body;
+  const { nama, deskripsi, no_phone_policy, kelompok_ids } = req.body;
 
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
     const [quizResult] = await connection.execute(
-      'INSERT INTO quiz (nama, deskripsi, status) VALUES (?, ?, ?)',
-      [nama, deskripsi || null, 'active']
+      'INSERT INTO quiz (nama, deskripsi, no_phone_policy, status) VALUES (?, ?, ?, ?)',
+      [nama, deskripsi || null, no_phone_policy ? 1 : 0, 'active']
     );
     const quizId = quizResult.insertId;
 
@@ -65,6 +102,7 @@ router.post('/', authenticate, authorize('admin'), validate(createQuizSchema), a
         id: quizId,
         nama,
         deskripsi: deskripsi || null,
+        no_phone_policy: no_phone_policy ? 1 : 0,
         kelompok_ids,
         assigned_kelompok: kelompok_ids.length,
       },
@@ -83,7 +121,7 @@ router.post('/', authenticate, authorize('admin'), validate(createQuizSchema), a
 router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const [quizRows] = await pool.execute('SELECT id, nama, deskripsi, status, created_at FROM quiz WHERE id = ?', [id]);
+  const [quizRows] = await pool.execute('SELECT id, nama, deskripsi, no_phone_policy, status, created_at FROM quiz WHERE id = ?', [id]);
   if (quizRows.length === 0) throw new ApiError(404, 'Quiz not found');
   const quiz = quizRows[0];
 
@@ -95,12 +133,20 @@ router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   );
 
   const [sesiRows] = await pool.execute(
-    `SELECT s.id, s.nama, s.tipe, s.status, s.waktu_mulai, s.waktu_selesai,
+    `SELECT s.id, s.nama, s.tipe, s.status, s.password, s.waktu_mulai, s.waktu_selesai,
             ds.nama AS daftar_soal_nama, p.nama AS pos_nama
      FROM sesi s
      LEFT JOIN daftar_soal ds ON s.daftar_soal_id = ds.id
      LEFT JOIN pos p ON s.pos_id = p.id
      WHERE s.quiz_id = ? ORDER BY s.id`,
+    [id]
+  );
+
+  // Fetch assigned workers
+  const [workerRows] = await pool.execute(
+    `SELECT p.id, p.nama, p.email FROM quiz_worker qw
+     INNER JOIN peserta p ON qw.peserta_id = p.id
+     WHERE qw.quiz_id = ? ORDER BY p.id`,
     [id]
   );
 
@@ -110,8 +156,31 @@ router.get('/:id', authenticate, asyncHandler(async (req, res) => {
       ...quiz,
       kelompok: kelompokRows,
       sesi: sesiRows,
+      assigned_workers: workerRows,
     },
   });
+}));
+
+/**
+ * POST /api/quiz/:id/assign-worker - assign a worker to a quiz (admin)
+ * Body: { peserta_id }
+ */
+router.post('/:id/assign-worker', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { peserta_id } = req.body;
+  if (!peserta_id) throw new ApiError(400, 'peserta_id required');
+
+  await pool.execute('INSERT IGNORE INTO quiz_worker (quiz_id, peserta_id) VALUES (?, ?)', [id, peserta_id]);
+  res.json({ success: true, data: { quiz_id: Number(id), peserta_id } });
+}));
+
+/**
+ * DELETE /api/quiz/:id/assign-worker/:peserta_id - remove assignment (admin)
+ */
+router.delete('/:id/assign-worker/:peserta_id', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { id, peserta_id } = req.params;
+  await pool.execute('DELETE FROM quiz_worker WHERE quiz_id = ? AND peserta_id = ?', [id, peserta_id]);
+  res.json({ success: true });
 }));
 
 /**
@@ -146,7 +215,7 @@ router.get('/:id/sesi', authenticate, asyncHandler(async (req, res) => {
 
 /**
  * GET /api/quiz/:id/leaderboard - leaderboard for quiz
- * Calculates from jawaban (individual) + kelompok_answer tables
+ * Merges leaderboard JSON from all sesi in this quiz
  */
 router.get('/:id/leaderboard', authenticate, asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -154,94 +223,36 @@ router.get('/:id/leaderboard', authenticate, asyncHandler(async (req, res) => {
   const [quizRows] = await pool.execute('SELECT id, nama FROM quiz WHERE id = ?', [id]);
   if (quizRows.length === 0) throw new ApiError(404, 'Quiz not found');
 
-  // Get all sesi in this quiz
-  const [sesiRows] = await pool.execute('SELECT id, tipe, nama FROM sesi WHERE quiz_id = ?', [id]);
-  const sesiIds = sesiRows.map(s => s.id);
-  const sesiMap = {};
-  sesiRows.forEach(s => { sesiMap[s.id] = s; });
+  // Get all sesi in this quiz with their leaderboards
+  const [sesiRows] = await pool.execute('SELECT id, nama, tipe, leaderboard FROM sesi WHERE quiz_id = ?', [id]);
 
-  const scoreMap = {}; // peserta_id -> { total_skor, kelompok_id, kelompok_nama }
+  // Merge all leaderboard JSONs
+  const scoreMap = {}; // key -> { nama, skor, kelompok_id? }
 
-  if (sesiIds.length > 0) {
-    const placeholders = sesiIds.map(() => '?').join(',');
+  for (const sesi of sesiRows) {
+    if (!sesi.leaderboard) continue;
+    const lb = JSON.parse(sesi.leaderboard);
+    // Skip internal tracking field
+    delete lb._answeredSoals;
 
-    // Individual scores from jawaban
-    const [jawabanRows] = await pool.execute(
-      `SELECT j.peserta_id, SUM(j.skor) AS total_skor
-       FROM jawaban j
-       WHERE j.sesi_id IN (${placeholders}) AND j.benar = 1
-       GROUP BY j.peserta_id`,
-      sesiIds
-    );
-
-    // Kelompok scores from kelompok_answer
-    const [kelompokAnswerRows] = await pool.execute(
-      `SELECT ka.kelompok_id, ka.peserta_id, COUNT(*) AS jawaban_count
-       FROM kelompok_answer ka
-       WHERE ka.sesi_id IN (${placeholders})
-       GROUP BY ka.kelompok_id, ka.peserta_id`,
-      sesiIds
-    );
-
-    jawabanRows.forEach(j => {
-      if (!scoreMap[j.peserta_id]) scoreMap[j.peserta_id] = { total_skor: 0, kelompok_id: null, kelompok_nama: null };
-      scoreMap[j.peserta_id].total_skor += j.total_skor || 0;
-    });
-
-    // For kelompok answers, we count per kelompok (display at kelompok level)
-    const kelompokScoreMap = {};
-    kelompokAnswerRows.forEach(ka => {
-      if (!kelompokScoreMap[ka.kelompok_id]) kelompokScoreMap[ka.kelompok_id] = 0;
-      kelompokScoreMap[ka.kelompok_id] += ka.jawaban_count || 0;
-    });
-
-    // Attach kelompok info to individual scores
-    const allPesertaIds = Object.keys(scoreMap);
-    if (allPesertaIds.length > 0) {
-      const pPlaceholders = allPesertaIds.map(() => '?').join(',');
-      const [pesertaInfo] = await pool.execute(
-        `SELECT p.id, p.nama, p.kelompok_id, k.nama AS kelompok_nama
-         FROM peserta p
-         LEFT JOIN kelompok k ON p.kelompok_id = k.id
-         WHERE p.id IN (${pPlaceholders})`,
-        allPesertaIds
-      );
-      pesertaInfo.forEach(p => {
-        if (scoreMap[p.id]) {
-          scoreMap[p.id].nama = p.nama;
-          scoreMap[p.id].kelompok_id = p.kelompok_id;
-          scoreMap[p.id].kelompok_nama = p.kelompok_nama;
-        }
-      });
-    }
-
-    // Build kelompok leaderboard entries
-    const kelompokIds = Object.keys(kelompokScoreMap);
-    if (kelompokIds.length > 0) {
-      const kPlaceholders = kelompokIds.map(() => '?').join(',');
-      const [kelompokInfo] = await pool.execute(
-        `SELECT id, nama FROM kelompok WHERE id IN (${kPlaceholders})`,
-        kelompokIds
-      );
-      const kelompokNameMap = {};
-      kelompokInfo.forEach(k => { kelompokNameMap[k.id] = k.nama; });
-
-      kelompokIds.forEach(kid => {
-        const key = `kelompok_${kid}`;
-        scoreMap[key] = {
-          peserta_id: null,
-          nama: kelompokNameMap[kid] || `Kelompok ${kid}`,
-          kelompok_id: parseInt(kid),
-          kelompok_nama: kelompokNameMap[kid] || `Kelompok ${kid}`,
-          total_skor: kelompokScoreMap[kid],
-          is_kelompok: true,
-        };
-      });
+    for (const [key, entry] of Object.entries(lb)) {
+      if (!scoreMap[key]) {
+        scoreMap[key] = { nama: entry.nama, skor: 0 };
+      }
+      scoreMap[key].skor += entry.skor || 0;
+      // Track kelompok_id if present (kelompok entries are numeric IDs)
+      if (sesi.tipe === 'kelompok') {
+        scoreMap[key].kelompok_id = parseInt(key);
+      }
     }
   }
 
-  const leaderboard = Object.values(scoreMap)
-    .sort((a, b) => b.total_skor - a.total_skor)
+  const leaderboard = Object.entries(scoreMap)
+    .map(([key, entry]) => ({
+      ...entry,
+      peserta_id: isNaN(parseInt(key)) ? null : parseInt(key),
+    }))
+    .sort((a, b) => b.skor - a.skor)
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 
   res.json({

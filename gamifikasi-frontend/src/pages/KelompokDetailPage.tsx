@@ -1,15 +1,19 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { kelompokApi, quizApi } from '@/services/api';
+import { useParams, Link, Navigate } from 'react-router-dom';
+import { useAuthStore } from '@/stores/authStore';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { kelompokApi } from '@/services/api';
 import { Navbar } from '@/components/Navbar';
 import { Users, BookOpen, Plus, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 
 export function KelompokDetailPage() {
+  const { user } = useAuthStore();
+  if (user?.role === 'worker') return <Navigate to="/peta" replace />;
   const { id } = useParams<{ id: string }>();
   const kelompokId = Number(id);
-  const [showQuizForm, setShowQuizForm] = useState(false);
-  const [selectedQuizIds, setSelectedQuizIds] = useState<number[]>([]);
+  const queryClient = useQueryClient();
+  const [newPesertaNama, setNewPesertaNama] = useState('');
+  const [showForm, setShowForm] = useState(false);
 
   const { data: kelompok, isLoading: loadingKelompok, error: errorKelompok } = useQuery({
     queryKey: ['kelompok', kelompokId],
@@ -23,14 +27,19 @@ export function KelompokDetailPage() {
     enabled: !!kelompokId,
   });
 
-  const { data: allQuizList } = useQuery({
-    queryKey: ['quiz', 'all-for-assign'],
-    queryFn: quizApi.getAll,
+  const addPesertaMutation = useMutation({
+    mutationFn: (nama: string) => kelompokApi.addPeserta(kelompokId, { nama }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kelompok', kelompokId] });
+      setNewPesertaNama('');
+      setShowForm(false);
+    },
   });
 
-  const handleAssignQuiz = () => {
-    setShowQuizForm(false);
-    setSelectedQuizIds([]);
+  const handleAddPeserta = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPesertaNama.trim()) return;
+    addPesertaMutation.mutate(newPesertaNama.trim());
   };
 
   const isLoading = loadingKelompok || loadingQuiz;
@@ -79,10 +88,56 @@ export function KelompokDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Peserta Table */}
               <div className="card">
-                <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
-                  <Users size={18} className="text-secondary" />
-                  Daftar Peserta
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-text flex items-center gap-2">
+                    <Users size={18} className="text-secondary" />
+                    Daftar Peserta
+                  </h3>
+                  <button
+                    onClick={() => setShowForm(!showForm)}
+                    className="btn-secondary text-sm flex items-center gap-1"
+                  >
+                    <Plus size={14} />
+                    Tambah Peserta
+                  </button>
+                </div>
+
+                {/* Add Peserta Form */}
+                {showForm && (
+                  <form onSubmit={handleAddPeserta} className="mb-4 p-4 bg-surface-alt rounded-lg border border-border">
+                    <label className="block text-xs font-medium text-text mb-1">Nama Peserta</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newPesertaNama}
+                        onChange={(e) => setNewPesertaNama(e.target.value)}
+                        placeholder="Masukkan nama lengkap"
+                        className="input-field text-sm flex-1"
+                        required
+                      />
+                      <button
+                        type="submit"
+                        disabled={addPesertaMutation.isPending || !newPesertaNama.trim()}
+                        className="btn-success text-sm"
+                      >
+                        {addPesertaMutation.isPending ? 'Menambah...' : 'Tambah'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowForm(false); setNewPesertaNama(''); }}
+                        className="btn-ghost text-sm"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                    {addPesertaMutation.isError && (
+                      <p className="text-xs text-danger mt-2">
+                        {(addPesertaMutation.error as Error)?.message || 'Gagal menambah peserta.'}
+                      </p>
+                    )}
+                  </form>
+                )}
+
                 {kelompok.peserta && kelompok.peserta.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -91,6 +146,7 @@ export function KelompokDetailPage() {
                           <th className="text-left py-2 px-2 text-text-muted font-medium">No</th>
                           <th className="text-left py-2 px-2 text-text-muted font-medium">Nama</th>
                           <th className="text-left py-2 px-2 text-text-muted font-medium">Email</th>
+                          <th className="text-left py-2 px-2 text-text-muted font-medium">Password</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -99,6 +155,9 @@ export function KelompokDetailPage() {
                             <td className="py-2.5 px-2 text-text-muted">{idx + 1}</td>
                             <td className="py-2.5 px-2 text-text font-medium">{peserta.nama}</td>
                             <td className="py-2.5 px-2 text-text-muted">{peserta.email}</td>
+                            <td className="py-2.5 px-2 text-text-muted font-mono text-xs">
+                              {peserta.password || 'password123'}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -109,75 +168,19 @@ export function KelompokDetailPage() {
                 )}
               </div>
 
-              {/* Quiz List */}
+              {/* Agenda List */}
               <div className="card">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-text flex items-center gap-2">
-                    <BookOpen size={18} className="text-secondary" />
-                    Quiz Terdaftar
-                  </h3>
-                  <button
-                    onClick={() => setShowQuizForm(!showQuizForm)}
-                    className="btn-secondary text-sm flex items-center gap-1"
-                  >
-                    <Plus size={14} />
-                    Tambah Quiz
-                  </button>
-                </div>
-
-                {/* Assign Quiz Form */}
-                {showQuizForm && (
-                  <div className="mb-4 p-4 bg-surface-alt rounded-lg border border-border">
-                    <h4 className="text-sm font-medium text-text mb-2">Pilih Quiz untuk Ditambahkan</h4>
-                    {allQuizList && allQuizList.length > 0 ? (
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {allQuizList
-                          .filter((q) => !quizList?.some((kq) => kq.id === q.id))
-                          .map((quiz) => (
-                            <label key={quiz.id} className="flex items-center gap-2 text-sm">
-                              <input
-                                type="checkbox"
-                                checked={selectedQuizIds.includes(quiz.id)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedQuizIds([...selectedQuizIds, quiz.id]);
-                                  } else {
-                                    setSelectedQuizIds(selectedQuizIds.filter((id) => id !== quiz.id));
-                                  }
-                                }}
-                                className="rounded border-border text-primary focus:ring-primary"
-                              />
-                              <span className="text-text">{quiz.nama}</span>
-                            </label>
-                          ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-text-muted">Tidak ada quiz tersedia.</p>
-                    )}
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={handleAssignQuiz}
-                        disabled={selectedQuizIds.length === 0}
-                        className="btn-accent text-sm"
-                      >
-                        Tambah
-                      </button>
-                      <button
-                        onClick={() => setShowQuizForm(false)}
-                        className="btn-ghost text-sm"
-                      >
-                        Batal
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
+                  <BookOpen size={18} className="text-secondary" />
+                  Agenda Terdaftar
+                </h3>
 
                 {quizList && quizList.length > 0 ? (
                   <div className="space-y-3">
                     {quizList.map((quiz) => (
                       <Link
                         key={quiz.id}
-                        to={`/quiz/${quiz.id}`}
+                        to={`/agenda/${quiz.id}`}
                         className="block p-3 bg-surface-alt rounded-lg hover:bg-primary-50 transition-colors border border-border-light"
                       >
                         <p className="font-medium text-text text-sm">{quiz.nama}</p>
@@ -189,7 +192,7 @@ export function KelompokDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-text-muted text-center py-4">Belum ada quiz ditugaskan.</p>
+                  <p className="text-text-muted text-center py-4">Belum ada agenda ditugaskan.</p>
                 )}
               </div>
             </div>

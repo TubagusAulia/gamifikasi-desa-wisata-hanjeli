@@ -2,13 +2,13 @@ const { z } = require('zod');
 
 // Auth schemas
 const loginSchema = z.object({
-  email: z.string().email('Invalid email format'),
+  email: z.string().trim().min(1, 'Email is required'),
   password: z.string().min(1, 'Password is required'),
 });
 
 const registerSchema = z.object({
   nama: z.string().min(1, 'Name is required').max(255),
-  email: z.string().email('Invalid email format'),
+  email: z.string().trim().min(1, 'Email is required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   role: z.enum(['peserta', 'admin', 'worker']).default('peserta'),
   kelompok_id: z.number().int().positive().optional(),
@@ -87,6 +87,7 @@ const createKelompokSchema = z.object({
 const createQuizSchema = z.object({
   nama: z.string().min(1, 'Nama quiz is required').max(255),
   deskripsi: z.string().optional(),
+  no_phone_policy: z.boolean().optional().default(false),
   kelompok_ids: z.array(z.number().int().positive()).min(1, 'At least one kelompok is required'),
 });
 
@@ -96,10 +97,11 @@ const createSesiSchema = z.object({
   daftar_soal_id: z.number().int().positive(),
   pos_id: z.number().int().positive(),
   nama: z.string().min(1, 'Nama sesi is required').max(255),
-  tipe: z.enum(['individu', 'kelompok']),
+  tipe: z.enum(['individu', 'kelompok']).optional(),
   waktu_mulai: z.string().optional(),
   waktu_selesai: z.string().optional(),
   status: z.enum(['inactive', 'active']).default('inactive'),
+  password: z.string().min(1, 'Password is required').max(255).optional(),
 });
 
 const updateSesiSchema = z.object({

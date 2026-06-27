@@ -1,11 +1,15 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuthStore } from '@/stores/authStore';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { kelompokApi } from '@/services/api';
 import { Navbar } from '@/components/Navbar';
 import { Users, Plus, Loader2, AlertCircle } from 'lucide-react';
 
 export function KelompokListPage() {
+  const { user } = useAuthStore();
+  // Redirect workers to the map (peta) — workers should not manage kelompok
+  if (user?.role === 'worker') return <Navigate to="/peta" replace />;
   const [showForm, setShowForm] = useState(false);
   const [nama, setNama] = useState('');
   const [pesertaText, setPesertaText] = useState('');

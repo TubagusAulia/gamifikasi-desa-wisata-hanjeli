@@ -1,8 +1,8 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type {
   AuthResponse, LoginCredentials, RegisterPayload, User,
-  Kelompok, Peserta, Quiz, Sesi, Soal, DaftarSoal, Pos, Review, ReviewSubmission,
-  LeaderboardEntry, ApiResponse,
+  Kelompok, Peserta, Agenda, QuizSession, Soal, DaftarSoal, Pos, Review, ReviewSubmission,
+  PhotoSubmission, PhotoLeaderboardEntry, LeaderboardEntry, CurrentQuizData, ApiResponse,
 } from '@/types';
 import { storage } from '@/utils/storage';
 
@@ -31,8 +31,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       storage.remove('token');
       storage.remove('user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      if (globalThis.location?.pathname !== '/login') {
+        globalThis.location.href = '/login';
       }
     }
     return Promise.reject(error);
@@ -57,42 +57,42 @@ export const kelompokApi = {
     api.get<ApiResponse<Kelompok & { peserta?: Peserta[] }>>(`/api/kelompok/${id}`).then((r) => r.data.data),
   getPeserta: (id: number): Promise<Peserta[]> =>
     api.get<ApiResponse<{ kelompok: Kelompok; peserta: Peserta[]; total: number }>>(`/api/kelompok/${id}/peserta`).then((r) => r.data.data.peserta),
-  getQuiz: (id: number): Promise<Quiz[]> =>
-    api.get<ApiResponse<{ kelompok: Kelompok; quiz: Quiz[]; total: number }>>(`/api/kelompok/${id}/quiz`).then((r) => r.data.data.quiz),
+  getQuiz: (id: number): Promise<Agenda[]> =>
+    api.get<ApiResponse<{ kelompok: Kelompok; quiz: Agenda[]; total: number }>>(`/api/kelompok/${id}/quiz`).then((r) => r.data.data.quiz),
+  addPeserta: (id: number, data: { nama: string }): Promise<Peserta> =>
+    api.post<ApiResponse<Peserta>>(`/api/kelompok/${id}/peserta`, data).then((r) => r.data.data),
   create: (data: { nama: string; peserta: { nama: string; email?: string; password?: string }[] }): Promise<Kelompok> =>
     api.post<ApiResponse<Kelompok>>('/api/kelompok', data).then((r) => r.data.data),
 };
 
-// Quiz
-export const quizApi = {
-  getAll: (): Promise<Quiz[]> =>
-    api.get<ApiResponse<Quiz[]>>('/api/quiz').then((r) => r.data.data),
-  getById: (id: number): Promise<Quiz> =>
-    api.get<ApiResponse<Quiz>>(`/api/quiz/${id}`).then((r) => r.data.data),
-  getSesi: (id: number): Promise<Sesi[]> =>
-    api.get<ApiResponse<{ quiz: Quiz; sesi: Sesi[]; total: number }>>(`/api/quiz/${id}/sesi`).then((r) => r.data.data.sesi),
+// Agenda (formerly Quiz)
+export const agendaApi = {
+  getAll: (): Promise<Agenda[]> =>
+    api.get<ApiResponse<Agenda[]>>('/api/quiz').then((r) => r.data.data),
+  getById: (id: number): Promise<Agenda> =>
+    api.get<ApiResponse<Agenda>>(`/api/quiz/${id}`).then((r) => r.data.data),
+  getQuizSessions: (id: number): Promise<QuizSession[]> =>
+    api.get<ApiResponse<{ quiz: Agenda; sesi: QuizSession[]; total: number }>>(`/api/quiz/${id}/sesi`).then((r) => r.data.data.sesi),
   getLeaderboard: (id: number): Promise<LeaderboardEntry[]> =>
     api.get<ApiResponse<LeaderboardEntry[]>>(`/api/quiz/${id}/leaderboard`).then((r) => r.data.data),
-  create: (data: { nama: string; deskripsi?: string; kelompok_ids: number[] }): Promise<Quiz> =>
-    api.post<ApiResponse<Quiz>>('/api/quiz', data).then((r) => r.data.data),
+  create: (data: { nama: string; deskripsi?: string; no_phone_policy?: boolean; kelompok_ids: number[] }): Promise<Agenda> =>
+    api.post<ApiResponse<Agenda>>('/api/quiz', data).then((r) => r.data.data),
 };
 
-// Sesi
-export const sesiApi = {
-  getById: (id: number): Promise<Sesi> =>
-    api.get<ApiResponse<Sesi>>(`/api/sesi/${id}`).then((r) => r.data.data),
-  getSesi: (id: number): Promise<Sesi> =>
-    api.get<ApiResponse<Sesi>>(`/api/sesi/${id}`).then((r) => r.data.data),
+// Quiz (individual session)
+export const quizApi = {
+  getById: (id: number): Promise<QuizSession> =>
+    api.get<ApiResponse<QuizSession>>(`/api/sesi/${id}`).then((r) => r.data.data),
   getSoal: (id: number): Promise<Soal[]> =>
-    api.get<ApiResponse<Soal[]>>(`/api/sesi/${id}/soal`).then((r) => r.data.data),
-  create: (data: Partial<Sesi>): Promise<Sesi> =>
-    api.post<ApiResponse<Sesi>>('/api/sesi', data).then((r) => r.data.data),
-  activate: (id: number): Promise<Sesi> =>
-    api.put<ApiResponse<Sesi>>(`/api/sesi/${id}/activate`, { status: 'active' }).then((r) => r.data.data),
+    api.get<ApiResponse<{ sesi: { id: number; nama: string; tipe: string; quiz_id: number }; questions: Soal[]; total: number }>>(`/api/sesi/${id}/soal`).then((r) => r.data.data.questions),
+  create: (data: Partial<QuizSession>): Promise<QuizSession> =>
+    api.post<ApiResponse<QuizSession>>('/api/sesi', data).then((r) => r.data.data),
+  activate: (id: number): Promise<QuizSession> =>
+    api.put<ApiResponse<QuizSession>>(`/api/sesi/${id}/activate`, { status: 'active' }).then((r) => r.data.data),
   submit: (id: number, data: { peserta_id: number; answers: { soal_id: number; jawaban: string }[] }): Promise<{ skor: number; jumlah_benar: number }> =>
     api.post<ApiResponse<{ skor: number; jumlah_benar: number }>>(`/api/sesi/${id}/submit`, data).then((r) => r.data.data),
-  kelompokAnswer: (id: number, data: { kelompok_id: number; soal_id: number; peserta_id: number }): Promise<void> =>
-    api.post(`/api/sesi/${id}/kelompok-answer`, data).then((r) => r.data),
+  kelompokAnswer: (id: number, data: { kelompok_id: number; soal_id: number; peserta_id: number }): Promise<{ skor: number }> =>
+    api.post<ApiResponse<{ skor: number }>>(`/api/sesi/${id}/kelompok-answer`, data).then((r) => r.data.data),
 };
 
 // Daftar Soal
@@ -103,6 +103,12 @@ export const daftarSoalApi = {
     api.get<ApiResponse<DaftarSoal>>(`/api/daftar-soal/${id}`).then((r) => r.data.data),
   create: (data: { nama: string; kategori: string; soal: Partial<Soal>[] }): Promise<DaftarSoal> =>
     api.post<ApiResponse<DaftarSoal>>('/api/daftar-soal', data).then((r) => r.data.data),
+};
+
+// Soal
+export const soalApi = {
+  getByQuiz: (quizId: number): Promise<Soal[]> =>
+    api.get<ApiResponse<{ sesi: { id: number; nama: string; tipe: string; quiz_id: number }; questions: Soal[]; total: number }>>(`/api/sesi/${quizId}/soal`).then((r) => r.data.data.questions),
 };
 
 // Pos
@@ -139,10 +145,33 @@ export const reviewApi = {
     api.put(`/api/review/${reviewId}/grade`, data).then((r) => r.data),
 };
 
+// Photo
+export const photoApi = {
+  upload: (formData: FormData): Promise<PhotoSubmission> =>
+    api.post<ApiResponse<PhotoSubmission>>('/api/photo/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data.data),
+  getGallery: (sesiId: number): Promise<PhotoSubmission[]> =>
+    api.get<ApiResponse<PhotoSubmission[]>>(`/api/photo/gallery/${sesiId}`).then((r) => r.data.data),
+  getLeaderboard: (sesiId: number): Promise<PhotoLeaderboardEntry[]> =>
+    api.get<ApiResponse<PhotoLeaderboardEntry[]>>(`/api/photo/leaderboard/${sesiId}`).then((r) => r.data.data),
+  getById: (submissionId: number): Promise<PhotoSubmission> =>
+    api.get<ApiResponse<PhotoSubmission>>(`/api/photo/submission/${submissionId}`).then((r) => r.data.data),
+  validate: (submissionId: number, data: { validasi_status: 'valid' | 'rejected' | 'pending'; validasi_note?: string; poin_adjustment?: number }) =>
+    api.put<ApiResponse<any>>(`/api/photo/submission/${submissionId}/validate`, data).then((r) => r.data.data),
+};
+
 // Leaderboard
 export const leaderboardApi = {
-  getSesi: (sesiId: number): Promise<LeaderboardEntry[]> =>
-    api.get<ApiResponse<LeaderboardEntry[]>>(`/api/leaderboard/sesi/${sesiId}`).then((r) => r.data.data),
+  getSession: (sesiId: number): Promise<LeaderboardEntry[]> =>
+    api.get<ApiResponse<{ sesi: { id: number; nama: string; tipe: string; quiz_id: number }; leaderboard: LeaderboardEntry[] }>>(`/api/leaderboard/sesi/${sesiId}`).then((r) => {
+      const entries = r.data.data.leaderboard;
+      // Normalize: backend uses total_skor/total_benar, frontend expects skor
+      return entries.map((e: LeaderboardEntry & { total_skor?: number; total_jawaban?: number }) => ({
+        ...e,
+        skor: e.skor ?? e.total_skor ?? e.total_jawaban ?? 0,
+      }));
+    }),
   getQuiz: (quizId: number): Promise<LeaderboardEntry[]> =>
     api.get<ApiResponse<LeaderboardEntry[]>>(`/api/leaderboard/quiz/${quizId}`).then((r) => r.data.data),
   getReview: (reviewId: number): Promise<LeaderboardEntry[]> =>
@@ -157,6 +186,18 @@ export const locationApi = {
     api.get<ApiResponse<(Pos & { distance_meters: number })[]>>(`/api/location/nearby-pos?lat=${lat}&lon=${lon}`).then((r) => r.data.data),
   getPeserta: (pesertaId: number): Promise<{ latitude: number; longitude: number; last_updated: string }> =>
     api.get(`/api/location/peserta/${pesertaId}`).then((r) => r.data),
+  getCurrentQuiz: () => api.get<ApiResponse<CurrentQuizData | null>>('/api/location/current-quiz').then((r) => r.data.data),
+};
+
+// Workers (admin) and quiz-worker assignments
+export const workerApi = {
+  list: (): Promise<{ id: number; nama: string; email: string }[]> =>
+    api.get<ApiResponse<{ id: number; nama: string; email: string }[]>>('/api/workers').then((r) => r.data.data),
+};
+
+export const quizAdminApi = {
+  assignWorker: (quizId: number, pesertaId: number) => api.post(`/api/quiz/${quizId}/assign-worker`, { peserta_id: pesertaId }).then((r) => r.data),
+  unassignWorker: (quizId: number, pesertaId: number) => api.delete(`/api/quiz/${quizId}/assign-worker/${pesertaId}`).then((r) => r.data),
 };
 
 export default api;

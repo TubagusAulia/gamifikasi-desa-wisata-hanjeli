@@ -6,6 +6,7 @@ const ApiError = require('../utils/apiError');
 const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { createKelompokSchema } = require('../utils/schemas');
+const { generatePesertaPassword } = require('../utils/password');
 
 const router = express.Router();
 
@@ -46,8 +47,8 @@ router.post('/', authenticate, authorize('admin'), validate(createKelompokSchema
     for (const p of peserta) {
       // Generate email if not provided
       const email = p.email || `${p.nama.toLowerCase().replace(/\s+/g, '.')}@peserta.com`;
-      // Default password
-      const password = p.password || 'password123';
+      // Generate random 8-char password (lowercase + numbers)
+      const password = p.password || generatePesertaPassword();
       const password_hash = await bcrypt.hash(password, 10);
 
       // Check for duplicate email
@@ -65,6 +66,7 @@ router.post('/', authenticate, authorize('admin'), validate(createKelompokSchema
         id: pesertaResult.insertId,
         nama: p.nama,
         email,
+        password,
         role: 'peserta',
         kelompok_id: kelompokId,
       });
@@ -105,11 +107,17 @@ router.get('/:id', authenticate, authorize('admin', 'worker'), asyncHandler(asyn
     [id]
   );
 
+  const pesertaWithPassword = pesertaRows.map((p) => ({
+    ...p,
+    password: 'password123',
+    userclass: p.role || 'peserta',
+  }));
+
   res.json({
     success: true,
     data: {
       ...kelompok,
-      peserta: pesertaRows,
+      peserta: pesertaWithPassword,
     },
   });
 }));
@@ -128,12 +136,62 @@ router.get('/:id/peserta', authenticate, authorize('admin', 'worker'), asyncHand
     [id]
   );
 
+  const pesertaWithPassword = pesertaRows.map((p) => ({
+    ...p,
+    password: 'password123',
+    userclass: p.role || 'peserta',
+  }));
+
   res.json({
     success: true,
     data: {
       kelompok: kelompokRows[0],
-      peserta: pesertaRows,
-      total: pesertaRows.length,
+      peserta: pesertaWithPassword,
+      total: pesertaWithPassword.length,
+    },
+  });
+}));
+
+/**
+ * POST /api/kelompok/:id/peserta - add a single peserta to an existing kelompok (admin only)
+ * Body: { nama: string }
+ */
+router.post('/:id/peserta', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { id: kelompokId } = req.params;
+  const { nama } = req.body;
+
+  if (!nama || !nama.trim()) {
+    throw new ApiError(400, 'Nama peserta is required');
+  }
+
+  const [kelompokRows] = await pool.execute('SELECT id FROM kelompok WHERE id = ?', [kelompokId]);
+  if (kelompokRows.length === 0) throw new ApiError(404, 'Kelompok not found');
+
+  const email = `${nama.toLowerCase().replace(/\s+/g, '.')}@peserta.com`;
+  const password = generatePesertaPassword();
+  const password_hash = await bcrypt.hash(password, 10);
+
+  // Check for duplicate email
+  const [existing] = await pool.execute('SELECT id FROM peserta WHERE email = ? LIMIT 1', [email]);
+  if (existing.length > 0) {
+    throw new ApiError(409, `Email already registered: ${email}`);
+  }
+
+  const [result] = await pool.execute(
+    'INSERT INTO peserta (nama, email, password_hash, role, kelompok_id) VALUES (?, ?, ?, ?, ?)',
+    [nama.trim(), email, password_hash, 'peserta', kelompokId]
+  );
+
+  res.status(201).json({
+    success: true,
+    data: {
+      id: result.insertId,
+      nama: nama.trim(),
+      email,
+      password,
+      role: 'peserta',
+      userclass: 'peserta',
+      kelompok_id: Number(kelompokId),
     },
   });
 }));

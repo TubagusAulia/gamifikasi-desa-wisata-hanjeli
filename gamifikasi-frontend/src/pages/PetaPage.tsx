@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { posApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { posApi, agendaApi, locationApi } from '@/services/api';
 import { Navbar } from '@/components/Navbar';
-import { MapPin, Loader2, Navigation, AlertCircle, Locate } from 'lucide-react';
-import type { Pos } from '@/types';
+import { MapPin, Loader2, Navigation, AlertCircle, Locate, PhoneOff, Phone } from 'lucide-react';
+import type { Pos, Agenda } from '@/types';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -39,7 +41,6 @@ const userIcon = L.divIcon({
   iconAnchor: [10, 10],
 });
 
-// Calculate distance between two coordinates in meters
 function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -55,6 +56,7 @@ function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 export function PetaPage() {
+  const { user } = useAuthStore();
   const [selectedPos, setSelectedPos] = useState<Pos | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [nearbyPos, setNearbyPos] = useState<Pos | null>(null);
@@ -65,10 +67,47 @@ export function PetaPage() {
   const markersRef = useRef<L.Marker[]>([]);
   const userMarkerRef = useRef<L.Marker | null>(null);
 
+  const role = user?.role;
+  const isPeserta = role === 'peserta';
+  const isPekerja = role === 'worker';
+  const navigate = useNavigate();
+
   const { data: posList, isLoading, error } = useQuery({
     queryKey: ['pos'],
     queryFn: posApi.getAll,
   });
+
+  // Fetch all agendas to check no_phone_policy
+  const { data: agendaList } = useQuery({
+    queryKey: ['quiz'],
+    queryFn: agendaApi.getAll,
+  });
+
+  // Map: pos_id → nearest agenda that has a sesi at this pos, with no_phone_policy info
+  const posAgendaMap = useCallback(() => {
+    const map: Record<number, { agenda: Agenda; hasPhone: boolean }> = {};
+    if (!agendaList || !posList) return map;
+
+    for (const agenda of agendaList) {
+      if (!agenda.sesi) continue;
+      for (const s of agenda.sesi) {
+        // Find which pos this sesi belongs to
+        const matchingPos = posList.find(p => s.pos_id === p.id);
+        if (matchingPos && !map[matchingPos.id]) {
+          // Use the nearest agenda (first one found) for this pos
+          map[matchingPos.id] = {
+            agenda,
+            hasPhone: !agenda.no_phone_policy,
+          };
+        }
+      }
+    }
+    return map;
+  }, [agendaList, posList]);
+
+  const getPosAgendaInfo = (posId: number) => {
+    return posAgendaMap()[posId] || null;
+  };
 
   // Get user location
   useEffect(() => {
@@ -108,13 +147,22 @@ export function PetaPage() {
     setNearbyPos(null);
   }, [userLocation, posList]);
 
+  // Send location to backend so server can update lokasi_peserta and inside_pos_id
+  useEffect(() => {
+    if (!userLocation || !user) return;
+    if (user.role !== 'peserta' && user.role !== 'worker') return; // peserta and worker should update their location
+
+    const pesertaId = typeof user.id === 'string' ? Number.parseInt(user.id, 10) : user.id;
+    // fire-and-forget update; backend will set inside_pos_id
+    locationApi.update({ peserta_id: pesertaId, lat: userLocation.lat, lon: userLocation.lng }).catch(() => {});
+  }, [userLocation, user]);
+
   // Initialize map once container is ready
   useEffect(() => {
     const container = mapContainerRef.current;
     if (!container || mapRef.current) return;
     if (container.clientHeight === 0) return;
 
-    // Center on user location if available, otherwise default
     const center: L.LatLngExpression = userLocation
       ? [userLocation.lat, userLocation.lng]
       : [-6.9147, 107.6098];
@@ -153,12 +201,19 @@ export function PetaPage() {
 
     const bounds: L.LatLngExpression[] = [];
 
-    // Include user location in bounds if available
     if (userLocation) {
       bounds.push([userLocation.lat, userLocation.lng]);
     }
 
     posList.forEach((pos) => {
+      L.circle([pos.latitude, pos.longitude], {
+        radius: pos.radius_meter,
+        color: '#4ade80',
+        fillColor: '#4ade80',
+        fillOpacity: 0.15,
+        weight: 2,
+      }).addTo(map);
+
       const marker = L.marker([pos.latitude, pos.longitude], { icon: posIcon })
         .addTo(map)
         .bindPopup(
@@ -215,7 +270,7 @@ export function PetaPage() {
           <div className="flex items-center gap-3">
             {userLocation && (
               <span className="text-xs text-success font-medium flex items-center gap-1">
-                <span className="w-2 h-2 bg-success rounded-full animate-pulse"></span>
+                <span className="mr-1 w-2 h-2 bg-success rounded-full animate-pulse"></span>
                 GPS Aktif
               </span>
             )}
@@ -224,24 +279,6 @@ export function PetaPage() {
             </p>
           </div>
         </div>
-
-        {/* Nearby POS Alert */}
-        {nearbyPos && (
-          <div className="mb-4 p-4 bg-success-50 border border-success/30 rounded-xl flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-success rounded-full flex items-center justify-center">
-                <MapPin size={20} className="text-white" />
-              </div>
-              <div>
-                <p className="font-semibold text-success-dark">Anda berada di {nearbyPos.nama}!</p>
-                <p className="text-sm text-text-muted">Anda dapat memulai quiz untuk pos ini.</p>
-              </div>
-            </div>
-            <button className="btn-success text-sm">
-              Mulai Quiz
-            </button>
-          </div>
-        )}
 
         {/* Location Error */}
         {locationError && (
@@ -272,7 +309,6 @@ export function PetaPage() {
                 />
               )}
 
-              {/* Center on user button */}
               {userLocation && (
                 <button
                   onClick={centerOnUser}
@@ -312,18 +348,34 @@ export function PetaPage() {
                     ? Math.round(getDistanceMeters(userLocation.lat, userLocation.lng, pos.latitude, pos.longitude))
                     : null;
                   const isNearby = nearbyPos?.id === pos.id;
+                  const agendaInfo = getPosAgendaInfo(pos.id);
+                  const posHasPhone = agendaInfo?.hasPhone;
+                  const activeSession = agendaInfo?.agenda?.sesi?.find((s: any) => s.pos_id === pos.id && s.status === 'active');
+                  const hasActiveSession = Boolean(activeSession);
+                  const assignedToThisQuiz = isPekerja && agendaInfo?.agenda?.assigned_workers?.some((w: any) => w.id === user?.id);
+
+                  // Determine buttons for this pos
+                  const showQuiz = isNearby && hasActiveSession && ((isPekerja && assignedToThisQuiz) || (isPeserta && posHasPhone));
+                  const showSubmitFoto = isNearby && hasActiveSession && (isPekerja || (isPeserta && posHasPhone));
+                  const cardClassName = isNearby
+                    ? 'border-secondary ring-2 ring-secondary/30 bg-secondary-50'
+                    : selectedPos?.id === pos.id
+                      ? 'border-primary ring-2 ring-primary/20 shadow-md'
+                      : 'hover:shadow-md';
 
                   return (
                     <div
                       key={pos.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => handlePosClick(pos)}
-                      className={`card p-3 cursor-pointer transition-all ${
-                        isNearby
-                          ? 'border-success ring-2 ring-success/30 bg-success-50'
-                          : selectedPos?.id === pos.id
-                          ? 'border-primary ring-2 ring-primary/20 shadow-md'
-                          : 'hover:shadow-md'
-                      }`}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          handlePosClick(pos);
+                        }
+                      }}
+                      className={`card p-3 cursor-pointer transition-all ${cardClassName}`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
@@ -350,6 +402,45 @@ export function PetaPage() {
                           </span>
                         )}
                       </div>
+
+                      {/* Agenda policy indicator */}
+                      {agendaInfo && (
+                        <div className="mt-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 w-fit ${
+                            posHasPhone
+                              ? 'bg-secondary-50 text-secondary-dark'
+                              : 'bg-warning-50 text-warning-dark'
+                          }`}>
+                            {posHasPhone ? <Phone size={10} /> : <PhoneOff size={10} />}
+                            {posHasPhone ? 'Phone Allowed' : 'No Phone Policy'}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      {(showQuiz || showSubmitFoto) && (
+                        <div className="flex gap-2 mt-3">
+                          {showQuiz && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate('/quiz/start');
+                              }}
+                              className="btn-warning text-xs flex-1"
+                            >
+                              {isPekerja ? 'Mulai Quiz' : 'Detail Quiz'}
+                            </button>
+                          )}
+                          {showSubmitFoto && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); void navigate('/submit-foto'); }}
+                              className="btn-accent text-xs flex-1"
+                            >
+                              Submit Foto
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
