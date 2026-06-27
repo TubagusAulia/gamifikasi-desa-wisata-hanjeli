@@ -20,7 +20,7 @@ router.post('/upload', authenticate, authorize('peserta'), upload.single('file')
   if (!peserta_id || !sesi_id || !lokasi_pos_id) {
     throw new ApiError(400, 'peserta_id, sesi_id, and lokasi_pos_id are required');
   }
-  if (req.user.id !== parseInt(peserta_id)) {
+  if (req.user.id !== Number.parseInt(peserta_id, 10)) {
     throw new ApiError(403, 'Can only upload your own photo');
   }
 
@@ -50,9 +50,9 @@ router.post('/upload', authenticate, authorize('peserta'), upload.single('file')
   if (io) {
     io.emit('photo_submitted', {
       submission_id: result.insertId,
-      peserta_id: parseInt(peserta_id),
-      sesi_id: parseInt(sesi_id),
-      lokasi_pos_id: parseInt(lokasi_pos_id),
+      peserta_id: Number.parseInt(peserta_id, 10),
+      sesi_id: Number.parseInt(sesi_id, 10),
+      lokasi_pos_id: Number.parseInt(lokasi_pos_id, 10),
       foto_url: fotoUrl,
       timestamp: new Date().toISOString(),
     });
@@ -99,7 +99,7 @@ router.get('/submission/:id', authenticate, asyncHandler(async (req, res) => {
 /**
  * PUT /api/photo/submission/:id/validate
  */
-router.put('/submission/:id/validate', authenticate, authorize('admin'), validate(validatePhotoSchema), asyncHandler(async (req, res) => {
+router.put('/submission/:id/validate', authenticate, authorize('admin', 'worker'), validate(validatePhotoSchema), asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { validasi_status, validasi_note, poin_adjustment } = req.body;
 
@@ -144,7 +144,7 @@ router.put('/submission/:id/validate', authenticate, authorize('admin'), validat
   res.json({
     success: true,
     data: {
-      submission_id: parseInt(id),
+      submission_id: Number.parseInt(id, 10),
       validasi_status,
       poin_diberikan: poin,
       message: `Photo ${validasi_status === 'valid' ? 'approved' : 'rejected'} successfully`,
@@ -173,6 +173,37 @@ router.get('/gallery/:sesi_id', authenticate, asyncHandler(async (req, res) => {
 
   const [rows] = await pool.execute(sql, params);
   res.json({ success: true, data: rows });
+}));
+
+/**
+ * GET /api/photo/leaderboard/:sesi_id - leaderboard for photo submissions in a sesi
+ */
+router.get('/leaderboard/:sesi_id', authenticate, asyncHandler(async (req, res) => {
+  const { sesi_id } = req.params;
+
+  const [rows] = await pool.execute(
+    `SELECT sa.peserta_id, p.nama,
+            COALESCE(SUM(sa.poin_diberikan), 0) AS total_poin,
+            COUNT(sa.id) AS submission_count,
+            SUM(sa.validasi_status = 'valid') AS valid_count
+     FROM submission_aktivitas sa
+     LEFT JOIN peserta p ON sa.peserta_id = p.id
+     WHERE sa.sesi_id = ?
+     GROUP BY sa.peserta_id, p.nama
+     ORDER BY total_poin DESC, valid_count DESC, submission_count ASC`,
+    [sesi_id]
+  );
+
+  const leaderboard = rows.map((row, index) => ({
+    rank: index + 1,
+    peserta_id: row.peserta_id,
+    nama: row.nama || 'Peserta',
+    total_poin: Number(row.total_poin || 0),
+    submission_count: Number(row.submission_count || 0),
+    valid_count: Number(row.valid_count || 0),
+  }));
+
+  res.json({ success: true, data: leaderboard });
 }));
 
 module.exports = router;

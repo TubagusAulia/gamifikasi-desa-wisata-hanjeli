@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { socketService } from '@/services/socket';
+import { locationApi } from '@/services/api';
 
 interface GeolocationState {
   position: { lat: number; lng: number } | null;
@@ -46,6 +47,13 @@ export function useGeolocation(intervalMs = 8000) {
           lat: posRef.current.lat,
           lon: posRef.current.lng,
         });
+        // Also POST to API to persist lokasi_peserta (server updates inside_pos_id)
+        try {
+          const pesertaId = typeof userId === 'string' ? parseInt(userId) : userId;
+          locationApi.update({ peserta_id: pesertaId, lat: posRef.current.lat, lon: posRef.current.lng }).catch(() => {});
+        } catch (err) {
+          // ignore
+        }
       }
     }, intervalMs);
   }, [intervalMs, userId]);

@@ -2,8 +2,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import {
   MapPin,
-  Trophy,
-  Camera,
   LayoutDashboard,
   Users,
   LogOut,
@@ -22,13 +20,9 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/kelompok', label: 'Kelompok', icon: <Users size={18} />, roles: ['admin', 'worker'] },
-  { to: '/quiz', label: 'Quiz', icon: <LayoutDashboard size={18} />, roles: ['admin', 'worker'] },
-  { to: '/review', label: 'Review Foto', icon: <Camera size={18} />, roles: ['admin', 'worker'] },
-  { to: '/peta', label: 'Peta', icon: <MapPin size={18} />, roles: ['admin', 'worker'] },
-  { to: '/my-quiz', label: 'Quiz Saya', icon: <LayoutDashboard size={18} />, roles: ['peserta'] },
-  { to: '/my-review', label: 'Review Saya', icon: <Camera size={18} />, roles: ['peserta'] },
-  { to: '/peta', label: 'Peta', icon: <MapPin size={18} />, roles: ['peserta'] },
+  { to: '/kelompok', label: 'Kelompok', icon: <Users size={18} />, roles: ['admin'] },
+  { to: '/agenda', label: 'Agenda', icon: <LayoutDashboard size={18} />, roles: ['admin'] },
+  { to: '/peta', label: 'Peta', icon: <MapPin size={18} />, roles: ['admin', 'worker', 'peserta'] },
 ];
 
 export function Navbar() {
@@ -46,12 +40,21 @@ export function Navbar() {
     navigate('/login');
   };
 
+  let homeLink = '/login';
+  if (user) {
+    if (user.role === 'peserta' || user.role === 'worker') {
+      homeLink = '/peta';
+    } else {
+      homeLink = '/kelompok';
+    }
+  }
+
   return (
     <nav className="bg-white border-b border-border sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to={user ? '/kelompok' : '/login'} className="flex items-center gap-2.5">
+          <Link to={homeLink} className="flex items-center gap-2.5">
             <img src={logoUrl} alt="Gamifikasi DWH" className="w-9 h-9" />
             <span className="font-bold text-lg text-primary-dark">Gamifikasi DWH</span>
           </Link>

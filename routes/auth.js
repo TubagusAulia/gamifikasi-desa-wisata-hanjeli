@@ -28,9 +28,13 @@ router.get('/me', authenticate, asyncHandler(async (req, res) => {
     throw new ApiError(404, 'User not found');
   }
 
+  // Mirror role as userclass for clients that expect that attribute
+  const user = rows[0];
+  user.userclass = user.role || 'peserta';
+
   res.json({
     success: true,
-    data: rows[0],
+    data: user,
   });
 }));
 
@@ -61,11 +65,12 @@ router.post('/login', validate(loginSchema), asyncHandler(async (req, res) => {
     { expiresIn: JWT_EXPIRES_IN }
   );
 
+  // Return user with userclass mirror for compatibility
   res.json({
     success: true,
     data: {
       token,
-      user: { id: user.id, nama: user.nama, email: user.email, role: user.role || 'peserta', kelompok_id: user.kelompok_id },
+      user: { id: user.id, nama: user.nama, email: user.email, role: user.role || 'peserta', kelompok_id: user.kelompok_id, userclass: user.role || 'peserta' },
     },
   });
 }));
@@ -98,7 +103,7 @@ router.post('/register', validate(registerSchema), asyncHandler(async (req, res)
     success: true,
     data: {
       token,
-      user: { id: result.insertId, nama, email, role: role || 'peserta', kelompok_id: kelompok_id || null },
+      user: { id: result.insertId, nama, email, role: role || 'peserta', kelompok_id: kelompok_id || null, userclass: role || 'peserta' },
     },
   });
 }));

@@ -13,8 +13,12 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login({ email, password });
-      navigate('/kelompok');
+      const user = await login({ email, password });
+      if (user.role === 'peserta' || user.role === 'worker') {
+        navigate('/peta');
+      } else {
+        navigate('/kelompok');
+      }
     } catch {
       // error is in store
     }

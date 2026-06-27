@@ -1,23 +1,16 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { quizApi, daftarSoalApi, posApi, sesiApi } from '@/services/api';
+import { quizApi, kelompokApi, leaderboardApi, soalApi } from '@/services/api';
 import { Navbar } from '@/components/Navbar';
-import { BookOpen, Clock, MapPin, Plus, Loader2, AlertCircle, ArrowLeft, Trophy, Users, Play } from 'lucide-react';
-import type { Sesi } from '@/types';
+import { Clock, MapPin, Users, Loader2, AlertCircle, ArrowLeft, BookOpen } from 'lucide-react';
+import type { QuizSession } from '@/types';
 
 export function QuizDetailPage() {
   const { id } = useParams<{ id: string }>();
   const quizId = Number(id);
-  const [showSesiForm, setShowSesiForm] = useState(false);
-  const [sesiForm, setSesiForm] = useState({
-    nama: '',
-    daftar_soal_id: 0,
-    pos_id: 0,
-    tipe: 'individu' as 'individu' | 'kelompok',
-    waktu_mulai: '',
-    waktu_selesai: '',
-  });
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [kelompokAnswers, setKelompokAnswers] = useState<Record<number, { peserta_id: number }>>({});
   const queryClient = useQueryClient();
 
   const { data: quiz, isLoading, error } = useQuery({
@@ -26,43 +19,42 @@ export function QuizDetailPage() {
     enabled: !!quizId,
   });
 
-  const sesiList = quiz?.sesi;
-
-  const { data: daftarSoalList } = useQuery({
-    queryKey: ['daftar-soal'],
-    queryFn: daftarSoalApi.getAll,
+  const { data: leaderboard } = useQuery({
+    queryKey: ['leaderboard', 'quiz', quizId],
+    queryFn: () => leaderboardApi.getQuiz(quizId),
+    enabled: !!quizId,
   });
 
-  const { data: posList } = useQuery({
-    queryKey: ['pos'],
-    queryFn: posApi.getAll,
+  const { data: soalList } = useQuery({
+    queryKey: ['quiz', quizId, 'soal'],
+    queryFn: () => soalApi.getByQuiz(quizId),
+    enabled: !!quizId,
   });
 
-  const createSesiMutation = useMutation({
-    mutationFn: sesiApi.create,
+  const activateMutation = useMutation({
+    mutationFn: () => quizApi.activate(quizId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quiz', quizId, 'sesi'] });
-      setShowSesiForm(false);
-      setSesiForm({
-        nama: '',
-        daftar_soal_id: 0,
-        pos_id: 0,
-        tipe: 'individu',
-        waktu_mulai: '',
-        waktu_selesai: '',
-      });
+      queryClient.invalidateQueries({ queryKey: ['quiz', quizId] });
     },
   });
 
-  const handleSubmitSesi = (e: React.FormEvent) => {
-    e.preventDefault();
-    createSesiMutation.mutate({
-      ...sesiForm,
-      quiz_id: quizId,
+  const kelompokAnswerMutation = useMutation({
+    mutationFn: (data: { kelompok_id: number; soal_id: number; peserta_id: number }) =>
+      quizApi.kelompokAnswer(quizId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leaderboard', 'quiz', quizId] });
+    },
+  });
+
+  const handleKelompokAnswer = (soalId: number, pesertaId: number, kelompokId: number) => {
+    kelompokAnswerMutation.mutate({
+      kelompok_id: kelompokId,
+      soal_id: soalId,
+      peserta_id: pesertaId,
     });
   };
 
-  const getStatusBadge = (status: Sesi['status']) => {
+  const getStatusLabel = (status: string) => {
     switch (status) {
       case 'active':
         return <span className="badge-success">Aktif</span>;
@@ -80,7 +72,7 @@ export function QuizDetailPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Link to="/quiz" className="inline-flex items-center gap-1 text-secondary hover:underline mb-4">
           <ArrowLeft size={16} />
-          Kembali ke Daftar Quiz
+          Kembali
         </Link>
 
         {isLoading && (
@@ -102,224 +94,140 @@ export function QuizDetailPage() {
             <div className="card mb-6">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-secondary-50 rounded-lg flex items-center justify-center">
-                  <BookOpen size={24} className="text-secondary" />
+                  <Clock size={24} className="text-secondary" />
                 </div>
-                <div className="flex-1">
+                <div>
                   <h1 className="text-2xl font-bold text-text">{quiz.nama}</h1>
-                  {quiz.deskripsi && <p className="text-text-muted mt-1">{quiz.deskripsi}</p>}
-                  <div className="flex items-center gap-3 mt-3">
-                    <span className={quiz.status === 'active' ? 'badge-success' : 'badge-warning bg-gray-100 text-text-muted'}>
-                      {quiz.status === 'active' ? 'Aktif' : 'Nonaktif'}
+                  <div className="flex items-center gap-3 mt-2">
+                    {getStatusLabel(quiz.status)}
+                    <span className={quiz.tipe === 'individu' ? 'badge-secondary' : 'badge-accent'}>
+                      {quiz.tipe}
                     </span>
-                    <span className="text-xs text-text-muted">
-                      Dibuat: {new Date(quiz.created_at).toLocaleDateString('id-ID')}
-                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t border-border">
+                <div className="flex items-center gap-2">
+                  <MapPin size={16} className="text-text-muted" />
+                  <div>
+                    <p className="text-xs text-text-muted">Pos</p>
+                    <p className="text-sm font-medium text-text">{quiz.pos_nama ?? '-'}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock size={16} className="text-text-muted" />
+                  <div>
+                    <p className="text-xs text-text-muted">Waktu Mulai</p>
+                    <p className="text-sm font-medium text-text">
+                      {new Date(quiz.waktu_mulai).toLocaleString('id-ID')}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock size={16} className="text-text-muted" />
+                  <div>
+                    <p className="text-xs text-text-muted">Waktu Selesai</p>
+                    <p className="text-sm font-medium text-text">
+                      {new Date(quiz.waktu_selesai).toLocaleString('id-ID')}
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Assigned Kelompok */}
+            {/* Daftar Soal */}
             <div className="card mb-6">
               <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
-                <Users size={18} className="text-secondary" />
-                Kelompok Terdaftar
+                {quiz.tipe === 'kelompok' ? (
+                  <Users size={18} className="text-accent" />
+                ) : (
+                  <BookOpen size={18} className="text-accent" />
+                )}
+                Daftar Soal
               </h3>
-              {quiz.kelompok && quiz.kelompok.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {quiz.kelompok.map((k) => (
-                    <Link
-                      key={k.id}
-                      to={`/kelompok/${k.id}`}
-                      className="badge-secondary hover:bg-secondary-100 transition-colors"
-                    >
-                      {k.nama}
-                    </Link>
+              {soalList && soalList.length > 0 ? (
+                <div className="space-y-4">
+                  {soalList.map((soal, idx) => (
+                    <div key={soal.id} className="p-4 bg-surface-alt rounded-lg border border-border">
+                      <p className="font-medium text-text text-sm mb-2">Soal #{idx + 1}</p>
+                      <p className="text-text-muted text-sm mb-3">{soal.pertanyaan}</p>
+                      <div className="space-y-1.5 text-sm">
+                        {soal.opsi_a && (
+                          <p className={soal.jawaban_benar === 'A' ? 'text-success font-medium' : 'text-text-muted'}>
+                            A. {soal.opsi_a} {soal.jawaban_benar === 'A' && '✓'}
+                          </p>
+                        )}
+                        {soal.opsi_b && (
+                          <p className={soal.jawaban_benar === 'B' ? 'text-success font-medium' : 'text-text-muted'}>
+                            B. {soal.opsi_b} {soal.jawaban_benar === 'B' && '✓'}
+                          </p>
+                        )}
+                        {soal.opsi_c && (
+                          <p className={soal.jawaban_benar === 'C' ? 'text-success font-medium' : 'text-text-muted'}>
+                            C. {soal.opsi_c} {soal.jawaban_benar === 'C' && '✓'}
+                          </p>
+                        )}
+                        {soal.opsi_d && (
+                          <p className={soal.jawaban_benar === 'D' ? 'text-success font-medium' : 'text-text-muted'}>
+                            D. {soal.opsi_d} {soal.jawaban_benar === 'D' && '✓'}
+                          </p>
+                        )}
+                      </div>
+                      {soal.penjelasan_jawaban_benar && (
+                        <p className="text-xs text-text-muted mt-2 italic">
+                          {soal.penjelasan_jawaban_benar}
+                        </p>
+                      )}
+                    </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-text-muted text-sm">Belum ada kelompok ditugaskan.</p>
+                <p className="text-text-muted text-center py-4">Belum ada soal untuk quiz ini.</p>
               )}
             </div>
 
-            {/* Sesi List */}
-            <div className="card mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-text flex items-center gap-2">
-                  <Clock size={18} className="text-secondary" />
-                  Daftar Sesi
-                </h3>
-                <div className="flex items-center gap-2">
-                  <Link
-                    to={`/leaderboard/quiz/${quizId}`}
-                    className="btn-accent text-sm flex items-center gap-1"
-                  >
-                    <Trophy size={14} />
-                    Leaderboard
-                  </Link>
-                  <button
-                    onClick={() => setShowSesiForm(!showSesiForm)}
-                    className="btn-secondary text-sm flex items-center gap-1"
-                  >
-                    <Plus size={14} />
-                    Tambah Sesi
-                  </button>
-                </div>
-              </div>
-
-              {/* Tambah Sesi Form */}
-              {showSesiForm && (
-                <div className="mb-4 p-4 bg-surface-alt rounded-lg border border-border">
-                  <h4 className="text-sm font-medium text-text mb-3">Tambah Sesi Baru</h4>
-                  <form onSubmit={handleSubmitSesi} className="space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-text mb-1">Nama Sesi</label>
-                        <input
-                          type="text"
-                          value={sesiForm.nama}
-                          onChange={(e) => setSesiForm({ ...sesiForm, nama: e.target.value })}
-                          className="input-field text-sm"
-                          placeholder="Contoh: Sesi 1"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-text mb-1">Tipe</label>
-                        <select
-                          value={sesiForm.tipe}
-                          onChange={(e) => setSesiForm({ ...sesiForm, tipe: e.target.value as 'individu' | 'kelompok' })}
-                          className="input-field text-sm"
-                        >
-                          <option value="individu">Individu</option>
-                          <option value="kelompok">Kelompok</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-text mb-1">Daftar Soal</label>
-                        <select
-                          value={sesiForm.daftar_soal_id}
-                          onChange={(e) => setSesiForm({ ...sesiForm, daftar_soal_id: Number(e.target.value) })}
-                          className="input-field text-sm"
-                          required
-                        >
-                          <option value={0}>Pilih Daftar Soal</option>
-                          {(daftarSoalList ?? []).map((ds) => (
-                            <option key={ds.id} value={ds.id}>
-                              {ds.nama} ({ds.kategori})
-                            </option>
-                          ))}
-                        </select>
-                        {(!daftarSoalList || daftarSoalList.length === 0) && (
-                          <p className="text-xs text-warning-dark mt-1">Belum ada daftar soal. Buat daftar soal terlebih dahulu.</p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-text mb-1">Pos</label>
-                        <select
-                          value={sesiForm.pos_id}
-                          onChange={(e) => setSesiForm({ ...sesiForm, pos_id: Number(e.target.value) })}
-                          className="input-field text-sm"
-                          required
-                        >
-                          <option value={0}>Pilih Pos</option>
-                          {(posList ?? []).map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.nama}
-                            </option>
-                          ))}
-                        </select>
-                        {(!posList || posList.length === 0) && (
-                          <p className="text-xs text-warning-dark mt-1">Belum ada pos tersedia.</p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-text mb-1">Waktu Mulai</label>
-                        <input
-                          type="datetime-local"
-                          value={sesiForm.waktu_mulai}
-                          onChange={(e) => setSesiForm({ ...sesiForm, waktu_mulai: e.target.value })}
-                          className="input-field text-sm"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-text mb-1">Waktu Selesai</label>
-                        <input
-                          type="datetime-local"
-                          value={sesiForm.waktu_selesai}
-                          onChange={(e) => setSesiForm({ ...sesiForm, waktu_selesai: e.target.value })}
-                          className="input-field text-sm"
-                          required
-                        />
-                      </div>
-                    </div>
-                    {createSesiMutation.isError && (
-                      <div className="flex items-center gap-2 p-2 bg-danger-50 text-danger rounded text-xs">
-                        <AlertCircle size={14} />
-                        Gagal menambah sesi.
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        disabled={createSesiMutation.isPending || !daftarSoalList?.length || !posList?.length}
-                        className="btn-success text-sm"
-                      >
-                        {createSesiMutation.isPending ? 'Memproses...' : 'Simpan'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowSesiForm(false)}
-                        className="btn-ghost text-sm"
-                      >
-                        Batal
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-
-              {/* Sesi Table */}
-              {sesiList && sesiList.length > 0 ? (
+            {/* Leaderboard */}
+            <div className="card">
+              <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
+                <Users size={18} className="text-accent" />
+                Leaderboard Quiz Ini
+              </h3>
+              {leaderboard && leaderboard.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border">
+                        <th className="text-left py-2.5 px-2 text-text-muted font-medium">Rank</th>
                         <th className="text-left py-2.5 px-2 text-text-muted font-medium">Nama</th>
-                        <th className="text-left py-2.5 px-2 text-text-muted font-medium">Tipe</th>
-                        <th className="text-left py-2.5 px-2 text-text-muted font-medium">Pos</th>
-                        <th className="text-left py-2.5 px-2 text-text-muted font-medium">Status</th>
-                        <th className="text-left py-2.5 px-2 text-text-muted font-medium">Waktu</th>
-                        <th className="text-left py-2.5 px-2 text-text-muted font-medium">Aksi</th>
+                        <th className="text-left py-2.5 px-2 text-text-muted font-medium">Skor</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {sesiList.map((sesi) => (
-                        <tr key={sesi.id} className="border-b border-border-light last:border-0 hover:bg-surface-hover">
-                          <td className="py-2.5 px-2 font-medium text-text">{sesi.nama}</td>
+                      {leaderboard.map((entry) => (
+                        <tr key={entry.rank} className="border-b border-border-light last:border-0 hover:bg-surface-hover">
                           <td className="py-2.5 px-2">
-                            <span className={sesi.tipe === 'individu' ? 'badge-secondary' : 'badge-accent'}>
-                              {sesi.tipe}
+                            <span className={`w-7 h-7 rounded-full inline-flex items-center justify-center text-xs font-bold ${
+                              entry.rank === 1
+                                ? 'bg-warning-50 text-warning-dark'
+                                : entry.rank === 2
+                                ? 'bg-gray-100 text-text-secondary'
+                                : entry.rank === 3
+                                ? 'bg-accent-50 text-accent-dark'
+                                : 'bg-surface-alt text-text-muted'
+                            }`}>
+                              {entry.rank}
                             </span>
                           </td>
-                          <td className="py-2.5 px-2 text-text-muted">{sesi.pos?.nama ?? '-'}</td>
-                          <td className="py-2.5 px-2">{getStatusBadge(sesi.status)}</td>
-                          <td className="py-2.5 px-2 text-xs text-text-muted">
-                            {new Date(sesi.waktu_mulai).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
-                          </td>
-                          <td className="py-2.5 px-2">
-                            <Link to={`/sesi/${sesi.id}`} className="text-secondary text-xs font-medium hover:underline">
-                              Lihat
-                            </Link>
-                          </td>
+                          <td className="py-2.5 px-2 font-medium text-text">{entry.nama}</td>
+                          <td className="py-2.5 px-2 text-accent font-bold">{entry.skor}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               ) : (
-                <p className="text-text-muted text-center py-4">Belum ada sesi. Tambahkan sesi pertama.</p>
+                <p className="text-text-muted text-center py-4">Belum ada data leaderboard.</p>
               )}
             </div>
           </>
