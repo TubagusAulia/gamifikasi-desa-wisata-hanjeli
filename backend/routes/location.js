@@ -176,7 +176,7 @@ router.get('/current-quiz', authenticate, authorize('peserta', 'worker'), asyncH
      INNER JOIN quiz q ON s.quiz_id = q.id
      INNER JOIN daftar_soal ds ON s.daftar_soal_id = ds.id
      INNER JOIN pos p ON s.pos_id = p.id
-     WHERE s.pos_id = ? AND s.status = 'active'
+     WHERE s.pos_id = ? AND (s.status = 'active' OR (s.waktu_mulai <= NOW() AND s.waktu_selesai >= NOW()))
      ORDER BY s.waktu_mulai ASC
      LIMIT 1`,
     [posId]

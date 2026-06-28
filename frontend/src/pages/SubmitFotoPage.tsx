@@ -18,7 +18,7 @@ export function SubmitFotoPage() {
   });
 
   const sesiId = currentQuiz?.sesi_id ?? null;
-  const canUpload = !!currentQuiz && currentQuiz.status === 'active' && currentQuiz.is_time_valid && user?.role === 'peserta';
+  const canUpload = !!currentQuiz && currentQuiz.is_time_valid && user?.role === 'peserta';
   const isWorker = user?.role !== 'peserta';
 
   const { data: leaderboard, isLoading: leaderboardLoading } = useQuery<PhotoLeaderboardEntry[]>({

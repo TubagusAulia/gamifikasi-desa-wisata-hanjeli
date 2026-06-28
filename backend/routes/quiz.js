@@ -36,7 +36,7 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
   if (quizIds.length > 0) {
     const placeholders = quizIds.map(() => '?').join(',');
     const [sesiRows] = await pool.execute(
-      `SELECT id, quiz_id, pos_id, nama, tipe FROM sesi WHERE quiz_id IN (${placeholders})`,
+      `SELECT id, quiz_id, pos_id, nama, tipe, status, waktu_mulai, waktu_selesai FROM sesi WHERE quiz_id IN (${placeholders})`,
       quizIds
     );
     sesiRows.forEach(s => {

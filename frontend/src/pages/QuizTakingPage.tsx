@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { quizApi } from '@/services/api';
 import { Navbar } from '@/components/Navbar';
 import { CheckCircle, Play, X, AlertCircle, Loader2, ArrowLeft, Clock, Users, Lock } from 'lucide-react';
+import { isSessionActive } from '@/utils/session';
 import type { QuizSession, Soal } from '@/types';
 
 export function QuizTakingPage() {
@@ -147,7 +148,7 @@ export function QuizTakingPage() {
   }
 
   // Not active yet
-  if (sesi.status !== 'active') {
+  if (!isSessionActive(sesi)) {
     return (
       <div className="min-h-screen bg-surface-alt">
         <Navbar />

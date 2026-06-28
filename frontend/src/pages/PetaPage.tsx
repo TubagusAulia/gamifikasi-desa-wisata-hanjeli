@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { posApi, agendaApi, locationApi } from '@/services/api';
 import { Navbar } from '@/components/Navbar';
 import { MapPin, Loader2, Navigation, AlertCircle, Locate, PhoneOff, Phone } from 'lucide-react';
+import { isSessionActive } from '@/utils/session';
 import type { Pos, Agenda } from '@/types';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -350,7 +351,7 @@ export function PetaPage() {
                   const isNearby = nearbyPos?.id === pos.id;
                   const agendaInfo = getPosAgendaInfo(pos.id);
                   const posHasPhone = agendaInfo?.hasPhone;
-                  const activeSession = agendaInfo?.agenda?.sesi?.find((s: any) => s.pos_id === pos.id && s.status === 'active');
+                  const activeSession = agendaInfo?.agenda?.sesi?.find((s: any) => s.pos_id === pos.id && isSessionActive(s));
                   const hasActiveSession = Boolean(activeSession);
                   const assignedToThisQuiz = isPekerja && agendaInfo?.agenda?.assigned_workers?.some((w: any) => w.id === user?.id);
 

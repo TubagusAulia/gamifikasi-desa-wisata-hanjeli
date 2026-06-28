@@ -214,12 +214,38 @@ router.get('/:id/quiz', authenticate, authorize('admin', 'worker'), asyncHandler
     [id]
   );
 
+  // Embed each quiz's sesi (with time window + pos) so the per-sesi list can render
+  // and its availability can be decided from the schedule instead of a manual toggle.
+  const quizIds = quizRows.map((q) => q.id);
+  let sesiMap = {};
+  if (quizIds.length > 0) {
+    const placeholders = quizIds.map(() => '?').join(',');
+    const [sesiRows] = await pool.execute(
+      `SELECT s.id, s.quiz_id, s.nama, s.tipe, s.status, s.waktu_mulai, s.waktu_selesai,
+              p.nama AS pos_nama
+       FROM sesi s
+       LEFT JOIN pos p ON s.pos_id = p.id
+       WHERE s.quiz_id IN (${placeholders})
+       ORDER BY s.id`,
+      quizIds
+    );
+    sesiRows.forEach((s) => {
+      if (!sesiMap[s.quiz_id]) sesiMap[s.quiz_id] = [];
+      sesiMap[s.quiz_id].push(s);
+    });
+  }
+
+  const quizWithSesi = quizRows.map((q) => ({
+    ...q,
+    sesi: sesiMap[q.id] || [],
+  }));
+
   res.json({
     success: true,
     data: {
       kelompok: kelompokRows[0],
-      quiz: quizRows,
-      total: quizRows.length,
+      quiz: quizWithSesi,
+      total: quizWithSesi.length,
     },
   });
 }));

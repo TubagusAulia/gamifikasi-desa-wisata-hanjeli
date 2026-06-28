@@ -1,5 +1,40 @@
+# This is a pure software repo. Deploy scaffolding (docker, ansible, compose,
+# nginx, build output) is local-only and not committed.
+
+# Dependencies
 node_modules/
+
+# Lockfiles (auto-generated)
+package-lock.json
+
+# Environment files — ignore real secrets; .env.example templates ARE committed
 .env
+backend/.env
+frontend/.env
+
+# Logs
 *.log
+
+# Uploads (user-generated runtime data)
 uploads/
+backend/uploads/
+
+# Build artifacts
+dist/
+
+# Deploy / packaging scaffolding (local homelab only)
+Dockerfile
+docker-compose.yml
+compose.yaml
+nginx/
+ansible/
+*.vault.yml
+.vault_pass
+
+# Editor & OS
 .DS_Store
+.vscode/
+.idea/
+
+# Legacy / scratch dirs
+gamifikasi-frontend_old/

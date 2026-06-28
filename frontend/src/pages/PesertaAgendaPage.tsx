@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { agendaApi, kelompokApi } from '@/services/api';
 import { Navbar } from '@/components/Navbar';
 import { BookOpen, Play, Loader2, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { isSessionActive } from '@/utils/session';
 import type { Agenda, QuizSession } from '@/types';
 
 export function PesertaAgendaPage() {
@@ -76,13 +77,13 @@ export function PesertaAgendaPage() {
                             <p className="text-sm font-medium text-text">{s.nama}</p>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                s.status === 'active'
+                                isSessionActive(s)
                                   ? 'bg-success-50 text-success-dark'
                                   : s.status === 'completed'
                                   ? 'bg-gray-100 text-text-muted'
                                   : 'bg-warning-50 text-warning-dark'
                               }`}>
-                                {s.status === 'active' ? 'Aktif' : s.status === 'completed' ? 'Selesai' : 'Nonaktif'}
+                                {isSessionActive(s) ? 'Aktif' : s.status === 'completed' ? 'Selesai' : 'Belum Aktif'}
                               </span>
                               <span className="text-xs text-text-muted">
                                 {s.tipe === 'kelompok' ? 'Kelompok' : 'Individu'}
@@ -90,7 +91,7 @@ export function PesertaAgendaPage() {
                             </div>
                           </div>
                         </div>
-                        {s.status === 'active' && (
+                        {isSessionActive(s) ? (
                           <button
                             onClick={() => handleStartQuiz(s)}
                             className="btn-success text-sm flex items-center gap-1"
@@ -98,14 +99,12 @@ export function PesertaAgendaPage() {
                             <Play size={14} />
                             Mulai
                           </button>
-                        )}
-                        {s.status === 'completed' && (
+                        ) : s.status === 'completed' ? (
                           <span className="text-xs text-success flex items-center gap-1">
                             <CheckCircle size={14} />
                             Selesai
                           </span>
-                        )}
-                        {s.status === 'inactive' && (
+                        ) : (
                           <span className="text-xs text-text-muted flex items-center gap-1">
                             <Clock size={14} />
                             Belum Aktif
