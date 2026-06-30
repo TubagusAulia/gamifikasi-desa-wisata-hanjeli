@@ -7,7 +7,6 @@ const validate = require('../middleware/validate');
 const {
   createQuizSchema,
   updateQuizSchema,
-  activateQuizSchema,
   submitJawabanSchema,
   kelompokAnswerSchema,
 } = require('../utils/schemas');
@@ -137,36 +136,6 @@ router.put('/:id', authenticate, authorize('admin'), validate(updateQuizSchema),
 
   const [rows] = await pool.execute('SELECT * FROM quiz WHERE id = ?', [id]);
   res.json({ success: true, data: rows[0], message: 'Quiz updated successfully' });
-}));
-
-/**
- * PUT /api/quiz/:id/activate - activate quiz (admin, worker)
- * Body: { status: 'active' }
- */
-router.put('/:id/activate', authenticate, authorize('admin', 'worker'), validate(activateQuizSchema), asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-
-  const [existing] = await pool.execute('SELECT id, nama FROM quiz WHERE id = ?', [id]);
-  if (existing.length === 0) throw new ApiError(404, 'Quiz not found');
-
-  await pool.execute('UPDATE quiz SET status = ? WHERE id = ?', [status, id]);
-
-  const io = req.app.get('io');
-  if (io) {
-    io.emit('quiz_activated', {
-      quiz_id: parseInt(id),
-      nama: existing[0].nama,
-      status,
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  res.json({
-    success: true,
-    data: { id: parseInt(id), status, nama: existing[0].nama },
-    message: `Quiz ${status === 'active' ? 'activated' : 'updated'} successfully`,
-  });
 }));
 
 /**

@@ -31,13 +31,6 @@ export function QuizDetailPage() {
     enabled: !!quizId,
   });
 
-  const activateMutation = useMutation({
-    mutationFn: () => quizApi.activate(quizId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quiz', quizId] });
-    },
-  });
-
   const kelompokAnswerMutation = useMutation({
     mutationFn: (data: { kelompok_id: number; soal_id: number; peserta_id: number }) =>
       quizApi.kelompokAnswer(quizId, data),

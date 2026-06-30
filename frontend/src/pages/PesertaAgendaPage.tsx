@@ -79,11 +79,9 @@ export function PesertaAgendaPage() {
                               <span className={`px-2 py-0.5 text-xs rounded-full ${
                                 isQuizActive(s)
                                   ? 'bg-success-50 text-success-dark'
-                                  : s.status === 'completed'
-                                  ? 'bg-gray-100 text-text-muted'
                                   : 'bg-warning-50 text-warning-dark'
                               }`}>
-                                {isQuizActive(s) ? 'Aktif' : s.status === 'completed' ? 'Selesai' : 'Belum Aktif'}
+                                {isQuizActive(s) ? 'Aktif' : 'Belum Aktif'}
                               </span>
                               <span className="text-xs text-text-muted">
                                 {s.tipe === 'kelompok' ? 'Kelompok' : 'Individu'}
@@ -99,11 +97,6 @@ export function PesertaAgendaPage() {
                             <Play size={14} />
                             Mulai
                           </button>
-                        ) : s.status === 'completed' ? (
-                          <span className="text-xs text-success flex items-center gap-1">
-                            <CheckCircle size={14} />
-                            Selesai
-                          </span>
                         ) : (
                           <span className="text-xs text-text-muted flex items-center gap-1">
                             <Clock size={14} />

@@ -84,7 +84,7 @@ export function QuizStartPage() {
   const selesaiDate = parseSessionDate(quiz.waktu_selesai);
   const isExpired = selesaiDate ? selesaiDate < now : false;
   const isUpcoming = mulaiDate ? mulaiDate > now : false;
-  const isActive = quiz.status === 'active' && quiz.is_time_valid && !isExpired && !isUpcoming;
+  const isActive = quiz.is_time_valid && !isExpired && !isUpcoming;
   const hasSubmitted = quiz.has_submitted === true;
 
   const getStatusInfo = (): { label: string; color: string; icon: React.ReactNode } => {
@@ -97,13 +97,7 @@ export function QuizStartPage() {
     if (!quiz.is_time_valid) {
       return { label: 'Di Luar Waktu', color: 'bg-warning-50 text-warning-dark', icon: <Clock size={14} /> };
     }
-    if (quiz.status === 'active') {
-      return { label: 'Aktif', color: 'bg-success-50 text-success-dark', icon: <Play size={14} /> };
-    }
-    if (quiz.status === 'completed') {
-      return { label: 'Selesai', color: 'bg-gray-100 text-text-muted', icon: <Clock size={14} /> };
-    }
-    return { label: 'Nonaktif', color: 'bg-warning-50 text-warning-dark', icon: <Clock size={14} /> };
+    return { label: 'Aktif', color: 'bg-success-50 text-success-dark', icon: <Play size={14} /> };
   };
 
   const statusInfo = getStatusInfo();

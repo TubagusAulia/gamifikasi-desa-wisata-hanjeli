@@ -33,7 +33,7 @@ export function QuizTakingPage() {
   const { data: soalList, isLoading: loadingSoal } = useQuery({
     queryKey: ['quiz', id, 'soal'],
     queryFn: () => quizApi.getSoal(id),
-    enabled: !!id && quiz?.status === 'active' && !quizCompleted && passwordVerified,
+    enabled: !!id && isQuizActive(quiz) && !quizCompleted && passwordVerified,
   });
 
   const handleVerifyPassword = () => {
@@ -160,7 +160,7 @@ export function QuizTakingPage() {
           <div className="card text-center py-12">
             <Clock size={48} className="mx-auto text-warning mb-4" />
             <h2 className="text-xl font-bold text-text mb-2">Quiz Belum Aktif</h2>
-            <p className="text-text-muted mb-4">Quiz &quot;{quiz.nama}&quot; belum diaktifkan oleh admin.</p>
+            <p className="text-text-muted mb-4">Quiz &quot;{quiz.nama}&quot; belum memasuki waktu pengerjaan.</p>
           </div>
         </div>
       </div>
