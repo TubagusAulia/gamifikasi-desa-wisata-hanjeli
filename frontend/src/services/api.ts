@@ -5,6 +5,7 @@ import type {
   PhotoSubmission, PhotoLeaderboardEntry, LeaderboardEntry, CurrentQuizData, ApiResponse,
 } from '@/types';
 import { storage } from '@/utils/storage';
+import { useAuthStore } from '@/stores/authStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -29,10 +30,17 @@ api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      storage.remove('token');
-      storage.remove('user');
-      if (globalThis.location?.pathname !== '/login') {
-        globalThis.location.href = '/login';
+      const { isInitialized, token } = useAuthStore.getState();
+      // Only tear down the session if we were actually authenticated and
+      // the session had finished loading. Prevents a spurious redirect to
+      // /login while loadSession() hasn't run yet.
+      if (isInitialized && token) {
+        storage.remove('token');
+        storage.remove('user');
+        useAuthStore.setState({ user: null, token: null });
+        if (globalThis.location?.pathname !== '/login') {
+          globalThis.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);

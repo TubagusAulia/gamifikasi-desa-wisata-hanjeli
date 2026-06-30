@@ -8,7 +8,17 @@ interface Props {
 }
 
 export function ProtectedRoute({ children, roles }: Props) {
-  const { user, token } = useAuthStore();
+  const { user, token, isInitialized } = useAuthStore();
+
+  // Wait until the session has been loaded from storage before deciding.
+  // Prevents a flash-redirect to /login on first render.
+  if (!isInitialized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-text-muted">
+        Memuat...
+      </div>
+    );
+  }
 
   if (!token || !user) {
     return <Navigate to="/login" replace />;

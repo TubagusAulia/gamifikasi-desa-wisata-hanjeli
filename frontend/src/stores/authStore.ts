@@ -9,6 +9,7 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isLoading: boolean;
+  isInitialized: boolean;
   error: string | null;
   login: (creds: LoginCredentials) => Promise<User>;
   register: (payload: RegisterPayload) => Promise<User>;
@@ -18,9 +19,10 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: storage.get<User>('user'),
-  token: storage.get<string>('token'),
+  user: null,
+  token: null,
   isLoading: false,
+  isInitialized: false,
   error: null,
 
   async login(creds) {
@@ -62,6 +64,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ token, user });
       socketService.connect(token);
     }
+    set({ isInitialized: true });
   },
 
   logout() {
