@@ -194,7 +194,7 @@ export function AgendaListPage() {
                   </div>
                   <div className="flex items-center gap-1 text-xs text-text-muted">
                     <Clock size={14} />
-                    <span>{agenda.sesi?.length ?? 0} quiz</span>
+                    <span>{agenda.quiz?.length ?? 0} quiz</span>
                   </div>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                     agenda.no_phone_policy

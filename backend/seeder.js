@@ -4,183 +4,48 @@ const fs = require('fs');
 const path = require('path');
 const { generatePesertaPassword, generateQuizPassword } = require('./utils/password');
 
-async function seed() {
-  console.log('[Seeder] Starting database seed...\n');
+const kelompokData = [
+  'Wisata SMK Telkom',
+  'TPLM Tel-U',
+  'KKN ITB',
+  'Turis 30/6/2026',
+];
 
-  // Create connection without database to drop/create it
-  const rootConn = await mysql.createConnection({
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    multipleStatements: true,
-  });
+const pesertaData = [
+  { nama: 'Admin 1', email: 'admin1@admin', role: 'admin', kelompok_id: null, password: 'admin' },
+  { nama: 'Admin 2', email: 'admin2@admin', role: 'admin', kelompok_id: null, password: 'admin' },
+  { nama: 'Pekerja 1', email: 'pekerja1@pekerja', role: 'worker', kelompok_id: null, password: 'pekerja' },
+  { nama: 'Pekerja 2', email: 'pekerja2@pekerja', role: 'worker', kelompok_id: null, password: 'pekerja' },
+  { nama: 'Apel', email: 'apel@peserta', role: 'peserta', kelompok_id: 0, password: 'peserta' },
+  { nama: 'Mangga', email: 'mangga@peserta', role: 'peserta', kelompok_id: 0, password: 'peserta' },
+  { nama: 'Nanas', email: 'nanas@peserta', role: 'peserta', kelompok_id: 0, password: 'peserta' },
+  { nama: 'Nadia Rahma', email: 'nadia2@peserta', role: 'peserta', kelompok_id: 0, password: 'peserta' },
+  { nama: 'Bayu Setiawan', email: 'bayu2@peserta', role: 'peserta', kelompok_id: 0, password: 'peserta' },
+  { nama: 'Espresso', email: 'espresso@peserta', role: 'peserta', kelompok_id: 1, password: 'peserta' },
+  { nama: 'Mocca', email: 'mocca@peserta', role: 'peserta', kelompok_id: 1, password: 'peserta' },
+  { nama: 'Matcha', email: 'matcha@peserta', role: 'peserta', kelompok_id: 1, password: 'peserta' },
+  { nama: 'Indah Permata', email: 'indah2@peserta', role: 'peserta', kelompok_id: 1, password: 'peserta' },
+  { nama: 'Joko Prasetyo', email: 'joko2@peserta', role: 'peserta', kelompok_id: 1, password: 'peserta' },
+  { nama: 'Kartika Dewi', email: 'kartika@peserta', role: 'peserta', kelompok_id: 2, password: 'peserta' },
+  { nama: 'Lukman Hakim', email: 'lukman@peserta', role: 'peserta', kelompok_id: 2, password: 'peserta' },
+  { nama: 'Maya Anggraini', email: 'maya@peserta', role: 'peserta', kelompok_id: 2, password: 'peserta' },
+  { nama: 'Nanda Pratama', email: 'nanda@peserta', role: 'peserta', kelompok_id: 2, password: 'peserta' },
+  { nama: 'Olivia Sari', email: 'olivia@peserta', role: 'peserta', kelompok_id: 2, password: 'peserta' },
+  { nama: 'Putra Ramadhan', email: 'putra@peserta', role: 'peserta', kelompok_id: 3, password: 'peserta' },
+  { nama: 'Qori Handayani', email: 'qori@peserta', role: 'peserta', kelompok_id: 3, password: 'peserta' },
+  { nama: 'Rina Susanti', email: 'rina@peserta', role: 'peserta', kelompok_id: 3, password: 'peserta' },
+  { nama: 'Surya Darma', email: 'surya@peserta', role: 'peserta', kelompok_id: 3, password: 'peserta' },
+  { nama: 'Tina Marlina', email: 'tina@peserta', role: 'peserta', kelompok_id: 3, password: 'peserta' },
+];
 
-  console.log('[Seeder] Ensuring database exists...');
-  await rootConn.query('CREATE DATABASE IF NOT EXISTS gamifikasi_dwh CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
-  await rootConn.end();
+const posData = [
+  { nama: 'Rumah Hanjeli', latitude: -6.973455, longitude: 107.635876, radius: 100, deskripsi: 'Pusat koordinasi dan edukasi hanjeli' },
+  { nama: 'Sawah Hanjeli', latitude: -6.978330, longitude: 107.630174, radius: 100, deskripsi: 'Area tanam dan panen hanjeli' },
+  { nama: 'Tumbuk & Nampih', latitude: -6.969282, longitude: 107.628157, radius: 100, deskripsi: 'Proses pascapanen tradisional' },
+  { nama: 'Panggang Rengginang', latitude: -6.972959, longitude: 107.629641, radius: 100, deskripsi: 'Produksi rengginang dan dodol' },
+];
 
-  // Now connect to the database
-  const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'gamifikasi_dwh',
-    waitForConnections: true,
-    connectionLimit: 10,
-    multipleStatements: true,
-  });
-
-  // Import schema from file using mysql CLI (more reliable for DDL)
-  console.log('[Seeder] Importing schema via mysql CLI...');
-  const sqlPath = path.join(__dirname, 'database_schema.sql');
-  const { execSync } = require('child_process');
-  try {
-    execSync(`cmd /c "type "${sqlPath}" | C:\\xampp\\mysql\\bin\\mysql.exe -u root gamifikasi_dwh"`, {
-      stdio: 'inherit',
-    });
-  } catch (err) {
-    console.error('Schema import failed:', err.message);
-  }
-  console.log('  ✓ Schema imported');
-
-  // Verify tables exist
-  const [tables] = await pool.query('SHOW TABLES');
-  console.log(`  ✓ Database has ${tables.length} tables\n`);
-
-  // Start seeding data
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    // Ensure no_phone_policy column exists (for older schemas)
-    try { await conn.query('ALTER TABLE quiz ADD COLUMN no_phone_policy TINYINT(1) DEFAULT 0'); } catch { /* column already exists */ }
-    // Ensure password column exists in sesi (for older schemas)
-    try { await conn.query('ALTER TABLE sesi ADD COLUMN password VARCHAR(255) DEFAULT NULL'); } catch { /* column already exists */ }
-
-    // Clear existing data
-    console.log('[Seeder] Clearing existing data...');
-    await conn.query('SET FOREIGN_KEY_CHECKS = 0');
-    const tablesToTruncate = [
-      'review_submission', 'review_kelompok', 'review',
-      'lokasi_peserta', 'geofence_event', 'submission_aktivitas', 'progress_peserta',
-      'activity_gallery', 'soal', 'daftar_soal', 'sesi', 'quiz_kelompok', 'quiz',
-      'pos', 'peserta', 'kelompok'
-    ];
-    for (const t of tablesToTruncate) {
-      try { await conn.query(`TRUNCATE TABLE ${t}`); } catch { /* table might not exist */ }
-    }
-    await conn.query('SET FOREIGN_KEY_CHECKS = 1');
-
-    // =====================================================
-    // KELOMPOK
-    // =====================================================
-    console.log('[Seeder] Creating kelompok...');
-    const kelompokData = [
-      'Wisata SMK Telkom',
-      'TPLM Tel-U',
-      'KKN ITB',
-      'Turis 30/6/2026',
-    ];
-
-    const kelompokIds = [];
-    for (const nama of kelompokData) {
-      const [result] = await conn.query('INSERT INTO kelompok (nama) VALUES (?)', [nama]);
-      kelompokIds.push(result.insertId);
-    }
-    console.log(`  ✓ Created ${kelompokIds.length} kelompok`);
-
-    // =====================================================
-    // PESERTA (5 per kelompok + admin + worker)
-    // =====================================================
-    console.log('[Seeder] Creating peserta...');
-
-    const pesertaData = [
-      { nama: 'Admin 1', email: 'admin1@admin', role: 'admin', kelompok_id: null, password: 'admin' },
-      { nama: 'Admin 2', email: 'admin2@admin', role: 'admin', kelompok_id: null, password: 'admin' },
-      { nama: 'Pekerja 1', email: 'pekerja1@pekerja', role: 'worker', kelompok_id: null, password: 'pekerja' },
-      { nama: 'Pekerja 2', email: 'pekerja2@pekerja', role: 'worker', kelompok_id: null, password: 'pekerja' },
-      // Wisata SMK Telkom (kelompokIds[0])
-      { nama: 'Apel', email: 'apel@peserta', role: 'peserta', kelompok_id: kelompokIds[0], password: 'peserta' },
-      { nama: 'Mangga', email: 'mangga@peserta', role: 'peserta', kelompok_id: kelompokIds[0], password: 'peserta' },
-      { nama: 'Nanas', email: 'nanas@peserta', role: 'peserta', kelompok_id: kelompokIds[0], password: 'peserta' },
-      { nama: 'Nadia Rahma', email: 'nadia2@peserta', role: 'peserta', kelompok_id: kelompokIds[0], password: 'peserta' },
-      { nama: 'Bayu Setiawan', email: 'bayu2@peserta', role: 'peserta', kelompok_id: kelompokIds[0], password: 'peserta' },
-      // TPLM Tel-U (kelompokIds[1])
-      { nama: 'Espresso', email: 'espresso@peserta', role: 'peserta', kelompok_id: kelompokIds[1], password: 'peserta' },
-      { nama: 'Mocca', email: 'mocca@peserta', role: 'peserta', kelompok_id: kelompokIds[1], password: 'peserta' },
-      { nama: 'Matcha', email: 'matcha@peserta', role: 'peserta', kelompok_id: kelompokIds[1], password: 'peserta' },
-      { nama: 'Indah Permata', email: 'indah2@peserta', role: 'peserta', kelompok_id: kelompokIds[1], password: 'peserta' },
-      { nama: 'Joko Prasetyo', email: 'joko2@peserta', role: 'peserta', kelompok_id: kelompokIds[1], password: 'peserta' },
-      // KKN ITB (kelompokIds[2])
-      { nama: 'Kartika Dewi', email: 'kartika@peserta', role: 'peserta', kelompok_id: kelompokIds[2], password: 'peserta' },
-      { nama: 'Lukman Hakim', email: 'lukman@peserta', role: 'peserta', kelompok_id: kelompokIds[2], password: 'peserta' },
-      { nama: 'Maya Anggraini', email: 'maya@peserta', role: 'peserta', kelompok_id: kelompokIds[2], password: 'peserta' },
-      { nama: 'Nanda Pratama', email: 'nanda@peserta', role: 'peserta', kelompok_id: kelompokIds[2], password: 'peserta' },
-      { nama: 'Olivia Sari', email: 'olivia@peserta', role: 'peserta', kelompok_id: kelompokIds[2], password: 'peserta' },
-      // Turis 30/6/2026 (kelompokIds[3])
-      { nama: 'Putra Ramadhan', email: 'putra@peserta', role: 'peserta', kelompok_id: kelompokIds[3], password: 'peserta' },
-      { nama: 'Qori Handayani', email: 'qori@peserta', role: 'peserta', kelompok_id: kelompokIds[3], password: 'peserta' },
-      { nama: 'Rina Susanti', email: 'rina@peserta', role: 'peserta', kelompok_id: kelompokIds[3], password: 'peserta' },
-      { nama: 'Surya Darma', email: 'surya@peserta', role: 'peserta', kelompok_id: kelompokIds[3], password: 'peserta' },
-      { nama: 'Tina Marlina', email: 'tina@peserta', role: 'peserta', kelompok_id: kelompokIds[3], password: 'peserta' },
-    ];
-
-    const pesertaIds = [];
-    const pesertaPasswords = {};
-    for (const p of pesertaData) {
-      const plainPassword = p.password || generatePesertaPassword();
-      const passwordHash = await bcrypt.hash(plainPassword, 10);
-      const [result] = await conn.query(
-        'INSERT INTO peserta (nama, email, password_hash, role, kelompok_id) VALUES (?, ?, ?, ?, ?)',
-        [p.nama, p.email, passwordHash, p.role, p.kelompok_id]
-      );
-      pesertaIds.push(result.insertId);
-      pesertaPasswords[p.email] = plainPassword;
-    }
-    console.log(`  ✓ Created ${pesertaIds.length} peserta`);
-
-    // =====================================================
-    // POS (4 pos only)
-    // =====================================================
-    console.log('[Seeder] Creating pos...');
-    const posData = [
-      { nama: 'Rumah Hanjeli', latitude: -6.973455, longitude: 107.635876, radius: 100, deskripsi: 'Pusat koordinasi dan edukasi hanjeli' },
-      { nama: 'Sawah Hanjeli', latitude: -6.978330, longitude: 107.630174, radius: 100, deskripsi: 'Area tanam dan panen hanjeli' },
-      { nama: 'Tumbuk & Nampih', latitude: -6.969282, longitude: 107.628157, radius: 100, deskripsi: 'Proses pascapanen tradisional' },
-      { nama: 'Panggang Rengginang', latitude: -6.972959, longitude: 107.629641, radius: 100, deskripsi: 'Produksi rengginang dan dodol' },
-    ];
-
-    const posIds = [];
-    for (const p of posData) {
-      const [result] = await conn.query(
-        'INSERT INTO pos (nama, latitude, longitude, radius_meter, deskripsi) VALUES (?, ?, ?, ?, ?)',
-        [p.nama, p.latitude, p.longitude, p.radius, p.deskripsi]
-      );
-      posIds.push(result.insertId);
-    }
-    console.log(`  ✓ Created ${posIds.length} pos`);
-
-    // =====================================================
-    // DAFTAR SOAL (4 daftar, 1 per POS — shared by all agendas)
-    // =====================================================
-    console.log('[Seeder] Creating daftar soal...');
-    const daftarSoalIds = []; // [posIdx] = id
-    for (let p = 0; p < 4; p++) {
-      const [result] = await conn.query(
-        'INSERT INTO daftar_soal (nama, kategori) VALUES (?, ?)',
-        [`Daftar Pertanyaan POS ${p + 1}`, 'SMA']
-      );
-      daftarSoalIds.push(result.insertId);
-    }
-    console.log(`  ✓ Created ${daftarSoalIds.length} daftar soal (shared)`);
-
-    // =====================================================
-    // SOAL (4 per daftar soal)
-    // =====================================================
-    console.log('[Seeder] Creating soal...');
-    const soalData = [
+const soalData = [
       // POS 1: Rumah Hanjeli
       { opsi_a: 'Abah Asep Hidayat Mustopa', opsi_b: 'Bapak Hely Sugriwa', opsi_c: 'Rahmat Yusuf', jawaban: 'A', poin: 1 },
       { opsi_a: 'Lebih rendah, yaitu hanya sekitar 4%', opsi_b: 'Hampir dua kali lipat, mencapai 14,5% - 15,8%', opsi_c: 'Sama persis, yaitu sebesar 8,8%', jawaban: 'B', poin: 1 },
@@ -264,147 +129,92 @@ async function seed() {
        'Kolaborasi akademis melahirkan aneka resep kue kering (cookies) berbasis tepung hanjeli murni untuk diversifikasi oleh-oleh eduwisata.'],
     ];
 
-    const soalIds = [];
-    for (let p = 0; p < 4; p++) {
-      for (let s = 0; s < 5; s++) {
-        const soalIndex = p * 5 + s;
-        const [result] = await conn.query(
-          'INSERT INTO soal (daftar_soal_id, pertanyaan, opsi_a, opsi_b, opsi_c, jawaban_benar, penjelasan_jawaban_benar, poin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [daftarSoalIds[p], pertanyaanMap[p][s], soalData[soalIndex].opsi_a, soalData[soalIndex].opsi_b, soalData[soalIndex].opsi_c, soalData[soalIndex].jawaban, penjelasanMap[p][s], soalData[soalIndex].poin]
-        );
-        soalIds.push(result.insertId);
-      }
+async function seed() {
+  console.log('[Seeder] Starting database seed...\n');
+
+  const rootConn = await mysql.createConnection({
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 3306,
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    multipleStatements: true,
+  });
+
+  console.log('[Seeder] Ensuring database exists...');
+  await rootConn.query('CREATE DATABASE IF NOT EXISTS gamifikasi_dwh CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+  await rootConn.end();
+
+  const pool = mysql.createPool({
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 3306,
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'gamifikasi_dwh',
+    waitForConnections: true,
+    connectionLimit: 10,
+    multipleStatements: true,
+  });
+
+  console.log('[Seeder] Importing schema via mysql CLI...');
+  const sqlPath = path.join(__dirname, '..', 'database_schema.sql');
+  const mysqlBin = 'C:\\xampp\\mysql\\bin\\mysql.exe';
+  const { execFileSync } = require('child_process');
+  try {
+    execFileSync(mysqlBin, ['-u', 'root', 'gamifikasi_dwh'], {
+      input: fs.readFileSync(sqlPath),
+      stdio: ['pipe', 'inherit', 'inherit'],
+    });
+  } catch (err) {
+    console.error('Schema import failed:', err.message);
+  }
+  console.log('  ✓ Schema imported');
+
+  const [tables] = await pool.query('SHOW TABLES');
+  console.log(`  ✓ Database has ${tables.length} tables\n`);
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    try { await conn.query('ALTER TABLE agenda ADD COLUMN no_phone_policy TINYINT(1) DEFAULT 0'); } catch { /* exists */ }
+    try { await conn.query('ALTER TABLE quiz ADD COLUMN password VARCHAR(255) DEFAULT NULL'); } catch { /* exists */ }
+
+    console.log('[Seeder] Clearing existing data...');
+    await conn.query('SET FOREIGN_KEY_CHECKS = 0');
+    const tablesToTruncate = [
+      'review_submission', 'review_kelompok', 'review',
+      'lokasi_peserta', 'geofence_event', 'submission_aktivitas', 'progress_peserta',
+      'activity_gallery', 'soal', 'daftar_soal', 'quiz', 'agenda_kelompok', 'agenda',
+      'pos', 'peserta', 'kelompok'
+    ];
+    for (const t of tablesToTruncate) {
+      try { await conn.query(`TRUNCATE TABLE ${t}`); } catch { /* not exist */ }
     }
+    await conn.query('SET FOREIGN_KEY_CHECKS = 1');
+
+    const kelompokIds = await seedKelompok(conn);
+    console.log(`  ✓ Created ${kelompokIds.length} kelompok`);
+
+    const posIds = await seedPos(conn);
+    console.log(`  ✓ Created ${posIds.length} pos`);
+
+    const { pesertaIds, pesertaPasswords } = await seedPeserta(conn, kelompokIds);
+    console.log(`  ✓ Created ${pesertaIds.length} peserta`);
+
+    const daftarSoalIds = await seedDaftarSoal(conn);
+    console.log(`  ✓ Created ${daftarSoalIds.length} daftar soal (shared)`);
+
+    const soalIds = await seedSoal(conn, daftarSoalIds, soalData, pertanyaanMap, penjelasanMap);
     console.log(`  ✓ Created ${soalIds.length} soal`);
 
-    // =====================================================
-    // QUIZ (1 per kelompok, 4 sesi per quiz — 1 per pos)
-    // =====================================================
-    console.log('[Seeder] Creating quiz & sesi per kelompok...');
-
-    // Wisata SMK Telkom & KKN ITB = kelompok type
-    // TPLM Tel-U & Turis 30/6/2026 = individu type
-    const kelompokQuizConfig = [
-      { kelompokIdx: 0, quizNama: 'Agenda Wisata SMK Telkom', noPhonePolicy: true },
-      { kelompokIdx: 1, quizNama: 'Agenda TPLM Tel-U', noPhonePolicy: false },
-      { kelompokIdx: 2, quizNama: 'Agenda KKN ITB', noPhonePolicy: true },
-      { kelompokIdx: 3, quizNama: 'Agenda Turis 30/6/2026', noPhonePolicy: false },
-    ];
-
-    // Schedule dates for each agenda
-    const agendaDates = [
-      { start: '2026-06-26', end: '2026-07-26' }, // Wisata SMK Telkom
-      { start: '2026-07-01', end: '2026-08-01' }, // TPLM Tel-U
-      { start: '2026-07-05', end: '2026-08-05' }, // KKN ITB
-      { start: '2026-07-10', end: '2026-08-10' }, // Turis
-    ];
-    const waktuMulai = ['08:00', '10:00', '13:00', '15:00'];
-    const waktuSelesai = ['09:30', '11:30', '14:30', '16:30'];
-
-    for (const config of kelompokQuizConfig) {
-      const kid = kelompokIds[config.kelompokIdx];
-      const kelNama = kelompokData[config.kelompokIdx];
-      const dates = agendaDates[config.kelompokIdx];
-
-      // Create quiz for this kelompok
-      const [quizResult] = await conn.query(
-        'INSERT INTO quiz (nama, deskripsi, no_phone_policy, status) VALUES (?, ?, ?, ?)',
-        [config.quizNama, `Agenda untuk kelompok ${kelNama}`, config.noPhonePolicy ? 1 : 0, 'active']
-      );
-      const quizId = quizResult.insertId;
-
-      // Assign quiz to this kelompok only
-      await conn.query('INSERT INTO quiz_kelompok (quiz_id, kelompok_id) VALUES (?, ?)', [quizId, kid]);
-
-      // Create 1 sesi per POS (4 sesi total) — tipe auto-set by no_phone_policy
-      const tipeSesi = config.noPhonePolicy ? 'kelompok' : 'individu';
-      const quizPasswords = {};
-      for (let p = 0; p < 4; p++) {
-        const plainPassword = generateQuizPassword();
-        quizPasswords[`POS ${p + 1}`] = plainPassword;
-        const [result] = await conn.query(
-          'INSERT INTO sesi (quiz_id, daftar_soal_id, pos_id, nama, tipe, waktu_mulai, waktu_selesai, status, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [
-            quizId,
-            daftarSoalIds[p],
-            posIds[p],
-            `${kelNama} POS ${p + 1}`,
-            tipeSesi,
-            `${dates.start} ${waktuMulai[p]}:00`,
-            `${dates.end} ${waktuSelesai[p]}:00`,
-            p === 0 ? 'active' : 'inactive',
-            plainPassword,
-          ]
-        );
-      }
-
-      console.log(`  ✓ Created quiz "${config.quizNama}" with 4 sesi (${config.noPhonePolicy ? 'No Phone' : 'Individu'}, ${dates.start} → ${dates.end})`);
-      console.log(`    Passwords: ${Object.entries(quizPasswords).map(([k, v]) => `${k}: ${v}`).join(' | ')}`);
-    }
-
-    // =====================================================
-    // ASSIGN DEMO WORKER TO SMK TELKOM QUIZ
-    // =====================================================
-    try {
-      const [[workerRow]] = await conn.query("SELECT id FROM peserta WHERE email = 'pekerja1@pekerja' LIMIT 1");
-      const [[smkQuiz]] = await conn.query("SELECT id FROM quiz WHERE nama = 'Agenda Wisata SMK Telkom' LIMIT 1");
-      if (workerRow && smkQuiz) {
-        await conn.query('CREATE TABLE IF NOT EXISTS quiz_worker (id INT AUTO_INCREMENT PRIMARY KEY, quiz_id INT NOT NULL, peserta_id INT NOT NULL, UNIQUE KEY uq (quiz_id, peserta_id))');
-        await conn.query('INSERT IGNORE INTO quiz_worker (quiz_id, peserta_id) VALUES (?, ?)', [smkQuiz.id, workerRow.id]);
-        console.log('  ✓ Assigned demo worker to Agenda Wisata SMK Telkom');
-      }
-    } catch (err) {
-      // ignore
-    }
-
-    // =====================================================
-    // REVIEW (1 per kelompok)
-    // =====================================================
-    console.log('[Seeder] Creating review per kelompok...');
-    for (let i = 0; i < kelompokIds.length; i++) {
-      const [reviewResult] = await conn.query(
-        'INSERT INTO review (nama, deskripsi, status) VALUES (?, ?, ?)',
-        [`Review Foto ${kelompokData[i]}`, `Upload foto aktivitas untuk kelompok ${kelompokData[i]}`, 'active']
-      );
-      const reviewId = reviewResult.insertId;
-      await conn.query('INSERT INTO review_kelompok (review_id, kelompok_id) VALUES (?, ?)', [reviewId, kelompokIds[i]]);
-    }
-    console.log(`  ✓ Created ${kelompokIds.length} review (1 per kelompok)`);
+    await seedAgendaAndQuiz(conn, kelompokIds, kelompokData, daftarSoalIds, posIds);
+    await seedWorkerAssignment(conn);
+    await seedReviews(conn, kelompokIds, kelompokData);
 
     await conn.commit();
 
     console.log('\n✅ [Seeder] Database seeded successfully!');
-    console.log('\n--- Login Accounts ---');
-    console.log(`  Admin 1:  admin1@admin / ${pesertaPasswords['admin1@admin']}`);
-    console.log(`  Admin 2: admin2@admin / ${pesertaPasswords['admin2@admin']}`);
-    console.log('  Workers:');
-    console.log(`    pekerja1@pekerja / ${pesertaPasswords['pekerja1@pekerja']}`);
-    console.log(`    pekerja2@pekerja / ${pesertaPasswords['pekerja2@pekerja']}`);
-    console.log('  Wisata SMK Telkom:');
-    console.log(`    apel@peserta / ${pesertaPasswords['apel@peserta']}`);
-    console.log(`    mangga@peserta / ${pesertaPasswords['mangga@peserta']}`);
-    console.log(`    nanas@peserta / ${pesertaPasswords['nanas@peserta']}`);
-    console.log(`    nadia2@peserta / ${pesertaPasswords['nadia2@peserta']}`);
-    console.log(`    bayu2@peserta / ${pesertaPasswords['bayu2@peserta']}`);
-    console.log('  TPLM Tel-U:');
-    console.log(`    espresso@peserta / ${pesertaPasswords['espresso@peserta']}`);
-    console.log(`    mocca@peserta / ${pesertaPasswords['mocca@peserta']}`);
-    console.log(`    matcha@peserta / ${pesertaPasswords['matcha@peserta']}`);
-    console.log(`    indah2@peserta / ${pesertaPasswords['indah2@peserta']}`);
-    console.log(`    joko2@peserta / ${pesertaPasswords['joko2@peserta']}`);
-    console.log('  KKN ITB:');
-    console.log(`    kartika@peserta / ${pesertaPasswords['kartika@peserta']}`);
-    console.log(`    lukman@peserta / ${pesertaPasswords['lukman@peserta']}`);
-    console.log(`    maya@peserta / ${pesertaPasswords['maya@peserta']}`);
-    console.log(`    nanda@peserta / ${pesertaPasswords['nanda@peserta']}`);
-    console.log(`    olivia@peserta / ${pesertaPasswords['olivia@peserta']}`);
-    console.log('  Turis 30/6/2026:');
-    console.log(`    putra@peserta / ${pesertaPasswords['putra@peserta']}`);
-    console.log(`    qori@peserta / ${pesertaPasswords['qori@peserta']}`);
-    console.log(`    rina@peserta / ${pesertaPasswords['rina@peserta']}`);
-    console.log(`    surya@peserta / ${pesertaPasswords['surya@peserta']}`);
-    console.log(`    tina@peserta / ${pesertaPasswords['tina@peserta']}`);
-
+    printLoginAccounts(pesertaPasswords);
   } catch (err) {
     await conn.rollback();
     console.error('\n❌ [Seeder] Error:', err.message);
@@ -413,6 +223,157 @@ async function seed() {
     conn.release();
     await pool.end();
     process.exit(0);
+  }
+}
+
+async function seedKelompok(conn) {
+  console.log('[Seeder] Creating kelompok...');
+  const kelompokIds = [];
+  for (const nama of kelompokData) {
+    const [result] = await conn.query('INSERT INTO kelompok (nama) VALUES (?)', [nama]);
+    kelompokIds.push(result.insertId);
+  }
+  return kelompokIds;
+}
+
+async function seedPos(conn) {
+  console.log('[Seeder] Creating pos...');
+  const posIds = [];
+  for (const p of posData) {
+    const [result] = await conn.query(
+      'INSERT INTO pos (nama, latitude, longitude, radius_meter, deskripsi) VALUES (?, ?, ?, ?, ?)',
+      [p.nama, p.latitude, p.longitude, p.radius, p.deskripsi]
+    );
+    posIds.push(result.insertId);
+  }
+  return posIds;
+}
+
+async function seedPeserta(conn, kelompokIds) {
+  console.log('[Seeder] Creating peserta...');
+  const pesertaIds = [];
+  const pesertaPasswords = {};
+  for (const p of pesertaData) {
+    const kelompokId = p.kelompok_id !== null ? kelompokIds[p.kelompok_id] : null;
+    const plainPassword = p.password || generatePesertaPassword();
+    const passwordHash = await bcrypt.hash(plainPassword, 10);
+    const [result] = await conn.query(
+      'INSERT INTO peserta (nama, email, password_hash, role, kelompok_id) VALUES (?, ?, ?, ?, ?)',
+      [p.nama, p.email, passwordHash, p.role, kelompokId]
+    );
+    pesertaIds.push(result.insertId);
+    pesertaPasswords[p.email] = plainPassword;
+  }
+  return { pesertaIds, pesertaPasswords };
+}
+
+async function seedDaftarSoal(conn) {
+  console.log('[Seeder] Creating daftar soal...');
+  const daftarSoalIds = [];
+  for (let p = 0; p < 4; p++) {
+    const [result] = await conn.query('INSERT INTO daftar_soal (nama, kategori) VALUES (?, ?)', [`Daftar Pertanyaan POS ${p + 1}`, 'SMA']);
+    daftarSoalIds.push(result.insertId);
+  }
+  return daftarSoalIds;
+}
+
+async function seedSoal(conn, daftarSoalIds, soalData, pertanyaanMap, penjelasanMap) {
+  console.log('[Seeder] Creating soal...');
+  const soalIds = [];
+  for (let p = 0; p < 4; p++) {
+    for (let s = 0; s < 5; s++) {
+      const idx = p * 5 + s;
+      const [result] = await conn.query(
+        'INSERT INTO soal (daftar_soal_id, pertanyaan, opsi_a, opsi_b, opsi_c, jawaban_benar, penjelasan_jawaban_benar, poin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [daftarSoalIds[p], pertanyaanMap[p][s], soalData[idx].opsi_a, soalData[idx].opsi_b, soalData[idx].opsi_c, soalData[idx].jawaban, penjelasanMap[p][s], soalData[idx].poin]
+      );
+      soalIds.push(result.insertId);
+    }
+  }
+  return soalIds;
+}
+
+async function seedAgendaAndQuiz(conn, kelompokIds, kelompokData, daftarSoalIds, posIds) {
+  console.log('[Seeder] Creating agenda & quiz per kelompok...');
+  const allPasswords = {};
+  const configs = [
+    { idx: 0, nama: 'Agenda Wisata SMK Telkom', noPhone: true },
+    { idx: 1, nama: 'Agenda TPLM Tel-U', noPhone: false },
+    { idx: 2, nama: 'Agenda KKN ITB', noPhone: true },
+    { idx: 3, nama: 'Agenda Turis 30/6/2026', noPhone: false },
+  ];
+  const dates = [
+    { start: '2026-06-26', end: '2026-07-26' },
+    { start: '2026-07-01', end: '2026-08-01' },
+    { start: '2026-07-05', end: '2026-08-05' },
+    { start: '2026-07-10', end: '2026-08-10' },
+  ];
+  const mulai = ['08:00', '10:00', '13:00', '15:00'];
+  const selesai = ['09:30', '11:30', '14:30', '16:30'];
+
+  for (const cfg of configs) {
+    const kid = kelompokIds[cfg.idx];
+    const kelNama = kelompokData[cfg.idx];
+    const [agendaResult] = await conn.query(
+      'INSERT INTO agenda (nama, deskripsi, no_phone_policy, status) VALUES (?, ?, ?, ?)',
+      [cfg.nama, `Agenda untuk kelompok ${kelNama}`, cfg.noPhone ? 1 : 0, 'active']
+    );
+    const agendaId = agendaResult.insertId;
+    await conn.query('INSERT INTO agenda_kelompok (agenda_id, kelompok_id) VALUES (?, ?)', [agendaId, kid]);
+
+    const tipe = cfg.noPhone ? 'kelompok' : 'individu';
+    const agendaPasswords = {};
+    for (let p = 0; p < 4; p++) {
+      const pw = generateQuizPassword();
+      agendaPasswords[`POS ${p + 1}`] = pw;
+      await conn.query(
+        'INSERT INTO quiz (agenda_id, daftar_soal_id, pos_id, nama, tipe, waktu_mulai, waktu_selesai, status, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [agendaId, daftarSoalIds[p], posIds[p], `${kelNama} POS ${p + 1}`, tipe, `${dates[cfg.idx].start} ${mulai[p]}:00`, `${dates[cfg.idx].end} ${selesai[p]}:00`, p === 0 ? 'active' : 'inactive', pw]
+      );
+    }
+    Object.assign(allPasswords, agendaPasswords);
+    console.log(`  ✓ Created agenda "${cfg.nama}" with 4 quiz (${cfg.noPhone ? 'No Phone' : 'Individu'}, ${dates[cfg.idx].start} → ${dates[cfg.idx].end})`);
+    console.log(`    Passwords: ${Object.entries(agendaPasswords).map(([k, v]) => `${k}: ${v}`).join(' | ')}`);
+  }
+  return allPasswords;
+}
+
+async function seedWorkerAssignment(conn) {
+  try {
+    const [[workerRow]] = await conn.query("SELECT id FROM peserta WHERE email = 'pekerja1@pekerja' LIMIT 1");
+    const [[smkAgenda]] = await conn.query("SELECT id FROM agenda WHERE nama = 'Agenda Wisata SMK Telkom' LIMIT 1");
+    if (workerRow && smkAgenda) {
+      await conn.query('CREATE TABLE IF NOT EXISTS agenda_worker (id INT AUTO_INCREMENT PRIMARY KEY, agenda_id INT NOT NULL, peserta_id INT NOT NULL, UNIQUE KEY uq (agenda_id, peserta_id))');
+      await conn.query('INSERT IGNORE INTO agenda_worker (agenda_id, peserta_id) VALUES (?, ?)', [smkAgenda.id, workerRow.id]);
+      console.log('  ✓ Assigned demo worker to Agenda Wisata SMK Telkom');
+    }
+  } catch { /* ignore */ }
+}
+
+async function seedReviews(conn, kelompokIds, kelompokData) {
+  console.log('[Seeder] Creating review per kelompok...');
+  for (let i = 0; i < kelompokIds.length; i++) {
+    const [result] = await conn.query('INSERT INTO review (nama, deskripsi, status) VALUES (?, ?, ?)', [`Review Foto ${kelompokData[i]}`, `Upload foto aktivitas untuk kelompok ${kelompokData[i]}`, 'active']);
+    await conn.query('INSERT INTO review_kelompok (review_id, kelompok_id) VALUES (?, ?)', [result.insertId, kelompokIds[i]]);
+  }
+  console.log(`  ✓ Created ${kelompokIds.length} review (1 per kelompok)`);
+}
+
+function printLoginAccounts(pesertaPasswords) {
+  console.log('\n--- Login Accounts ---');
+  const groups = {
+    'Admin': ['admin1@admin', 'admin2@admin'],
+    'Workers': ['pekerja1@pekerja', 'pekerja2@pekerja'],
+    'Wisata SMK Telkom': ['apel@peserta', 'mangga@peserta', 'nanas@peserta', 'nadia2@peserta', 'bayu2@peserta'],
+    'TPLM Tel-U': ['espresso@peserta', 'mocca@peserta', 'matcha@peserta', 'indah2@peserta', 'joko2@peserta'],
+    'KKN ITB': ['kartika@peserta', 'lukman@peserta', 'maya@peserta', 'nanda@peserta', 'olivia@peserta'],
+    'Turis 30/6/2026': ['putra@peserta', 'qori@peserta', 'rina@peserta', 'surya@peserta', 'tina@peserta'],
+  };
+  for (const [group, emails] of Object.entries(groups)) {
+    console.log(`  ${group}:`);
+    for (const email of emails) {
+      console.log(`    ${email} / ${pesertaPasswords[email]}`);
+    }
   }
 }
 

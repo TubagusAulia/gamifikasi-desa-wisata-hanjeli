@@ -52,9 +52,9 @@ CREATE TABLE pos (
 ) ENGINE=InnoDB;
 
 -- =====================================================
--- TABEL: quiz (like an LMS class/course)
+-- TABEL: agenda (like an LMS class/course)
 -- =====================================================
-CREATE TABLE quiz (
+CREATE TABLE agenda (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nama VARCHAR(255) NOT NULL,
   deskripsi TEXT,
@@ -64,27 +64,27 @@ CREATE TABLE quiz (
 ) ENGINE=InnoDB;
 
 -- =====================================================
--- TABEL: quiz_kelompok (which kelompok assigned to quiz)
+-- TABEL: agenda_kelompok (which kelompok assigned to agenda)
 -- =====================================================
-CREATE TABLE quiz_kelompok (
+CREATE TABLE agenda_kelompok (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  quiz_id INT NOT NULL,
+  agenda_id INT NOT NULL,
   kelompok_id INT NOT NULL,
-  FOREIGN KEY (quiz_id) REFERENCES quiz(id) ON DELETE CASCADE,
+  FOREIGN KEY (agenda_id) REFERENCES agenda(id) ON DELETE CASCADE,
   FOREIGN KEY (kelompok_id) REFERENCES kelompok(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_quiz_kelompok (quiz_id, kelompok_id)
+  UNIQUE KEY unique_agenda_kelompok (agenda_id, kelompok_id)
 ) ENGINE=InnoDB;
 
 -- =====================================================
--- TABEL: quiz_worker (which worker users are assigned to a quiz/agenda)
+-- TABEL: agenda_worker (which worker users are assigned to an agenda)
 -- =====================================================
-CREATE TABLE IF NOT EXISTS quiz_worker (
+CREATE TABLE IF NOT EXISTS agenda_worker (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  quiz_id INT NOT NULL,
+  agenda_id INT NOT NULL,
   peserta_id INT NOT NULL,
-  FOREIGN KEY (quiz_id) REFERENCES quiz(id) ON DELETE CASCADE,
+  FOREIGN KEY (agenda_id) REFERENCES agenda(id) ON DELETE CASCADE,
   FOREIGN KEY (peserta_id) REFERENCES peserta(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_quiz_worker (quiz_id, peserta_id)
+  UNIQUE KEY unique_agenda_worker (agenda_id, peserta_id)
 ) ENGINE=InnoDB;
 
 -- =====================================================
@@ -117,11 +117,11 @@ CREATE TABLE soal (
 ) ENGINE=InnoDB;
 
 -- =====================================================
--- TABEL: sesi (scheduled activity within a quiz)
+-- TABEL: quiz (scheduled activity within an agenda)
 -- =====================================================
-CREATE TABLE sesi (
+CREATE TABLE quiz (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  quiz_id INT NOT NULL,
+  agenda_id INT NOT NULL,
   daftar_soal_id INT NOT NULL,
   pos_id INT NOT NULL,
   nama VARCHAR(255) NOT NULL,
@@ -132,14 +132,14 @@ CREATE TABLE sesi (
   password VARCHAR(255) DEFAULT NULL,
   leaderboard JSON DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (quiz_id) REFERENCES quiz(id) ON DELETE CASCADE,
+  FOREIGN KEY (agenda_id) REFERENCES agenda(id) ON DELETE CASCADE,
   FOREIGN KEY (daftar_soal_id) REFERENCES daftar_soal(id) ON DELETE CASCADE,
   FOREIGN KEY (pos_id) REFERENCES pos(id) ON DELETE CASCADE,
-  INDEX idx_quiz (quiz_id),
+  INDEX idx_agenda (agenda_id),
   INDEX idx_status (status)
 ) ENGINE=InnoDB;
 
--- leaderboard JSON is stored directly on sesi table (added below)
+-- leaderboard JSON is stored directly on quiz table (added below)
 
 -- =====================================================
 -- TABEL: review (photo submission activity)
@@ -237,13 +237,13 @@ INSERT INTO soal (daftar_soal_id, pertanyaan, opsi_a, opsi_b, opsi_c, opsi_d, ja
   (2, 'Apa tanaman utama di sawah?', 'Padi', 'Jagung', 'Kedelai', 'Teh', 'A', 1),
   (2, 'Berapa musim tanam dalam setahun?', '1', '2', '3', '4', 'B', 1);
 
-INSERT INTO quiz (nama, deskripsi) VALUES
+INSERT INTO agenda (nama, deskripsi) VALUES
   ('Quiz Ekspedisi Hanjeli', 'Quiz utama untuk semua kelompok yang berkunjung');
 
-INSERT INTO quiz_kelompok (quiz_id, kelompok_id) VALUES
+INSERT INTO agenda_kelompok (agenda_id, kelompok_id) VALUES
   (1, 1), (1, 2), (1, 3);
 
-INSERT INTO sesi (quiz_id, daftar_soal_id, pos_id, nama, tipe, waktu_mulai, waktu_selesai, status) VALUES
+INSERT INTO quiz (agenda_id, daftar_soal_id, pos_id, nama, tipe, waktu_mulai, waktu_selesai, status) VALUES
   (1, 1, 1, 'Sesi Pagi - Pertanian', 'individu', '2026-06-25 09:00:00', '2026-06-25 10:30:00', 'active'),
   (1, 1, 2, 'Sesi Siang - Nge-Debug', 'kelompok', '2026-06-25 11:00:00', '2026-06-25 12:30:00', 'inactive'),
   (1, 2, 3, 'Sesi Sore - Produksi', 'individu', '2026-06-25 14:00:00', '2026-06-25 15:30:00', 'inactive');

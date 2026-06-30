@@ -11,12 +11,12 @@ const router = express.Router();
  */
 router.get('/foto-gallery', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const [rows] = await pool.execute(
-    `SELECT sa.id, sa.peserta_id, sa.sesi_id, sa.lokasi_pos_id, sa.foto_url, sa.caption,
-            sa.validasi_status, sa.poin_diberikan, sa.created_at, p.nama, lp.nama_pos, s.nama_sesi
+    `SELECT sa.id, sa.peserta_id, sa.quiz_id, sa.lokasi_pos_id, sa.foto_url, sa.caption,
+            sa.validasi_status, sa.poin_diberikan, sa.created_at, p.nama, lp.nama_pos, q.nama AS quiz_nama
      FROM submission_aktivitas sa
      LEFT JOIN peserta p ON sa.peserta_id = p.id
      LEFT JOIN lokasi_pos lp ON sa.lokasi_pos_id = lp.id
-     LEFT JOIN sesi s ON sa.sesi_id = s.id
+     LEFT JOIN quiz q ON sa.quiz_id = q.id
      ORDER BY sa.created_at DESC`
   );
   res.json({ success: true, data: rows });
@@ -27,7 +27,7 @@ router.get('/foto-gallery', authenticate, authorize('admin'), asyncHandler(async
  */
 router.get('/dashboard-stats', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const [[pesertaCount]] = await pool.execute('SELECT COUNT(*) as count FROM peserta');
-  const [[sesiCount]] = await pool.execute('SELECT COUNT(*) as count FROM sesi');
+  const [[quizCount]] = await pool.execute('SELECT COUNT(*) as count FROM quiz');
   const [[posCount]] = await pool.execute('SELECT COUNT(*) as count FROM lokasi_pos');
   const [[submissionCount]] = await pool.execute('SELECT COUNT(*) as count FROM submission_aktivitas');
   const [[pendingCount]] = await pool.execute("SELECT COUNT(*) as count FROM submission_aktivitas WHERE validasi_status = 'pending'");
@@ -39,19 +39,19 @@ router.get('/dashboard-stats', authenticate, authorize('admin'), asyncHandler(as
      ORDER BY sa.created_at DESC LIMIT 10`
   );
 
-  const [activeSessions] = await pool.execute("SELECT id, nama_sesi, status FROM sesi WHERE status = 'active' ORDER BY created_at DESC");
+  const [activeQuizzes] = await pool.execute("SELECT id, nama, status FROM quiz WHERE status = 'active' ORDER BY created_at DESC");
 
   res.json({
     success: true,
     data: {
       totals: {
         peserta: pesertaCount.count,
-        sesi: sesiCount.count,
+        quiz: quizCount.count,
         pos: posCount.count,
         submissions: submissionCount.count,
         pending_validations: pendingCount.count,
       },
-      active_sessions: activeSessions,
+      active_quizzes: activeQuizzes,
       recent_submissions: recentSubmissions,
     },
   });

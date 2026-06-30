@@ -5,16 +5,16 @@ import { useAuthStore } from '@/stores/authStore';
 import { quizApi } from '@/services/api';
 import { Navbar } from '@/components/Navbar';
 import { CheckCircle, Play, X, AlertCircle, Loader2, ArrowLeft, Clock, Users, Lock } from 'lucide-react';
-import { isSessionActive } from '@/utils/session';
+import { isQuizActive } from '@/utils/session';
 import type { QuizSession, Soal } from '@/types';
 
 export function QuizTakingPage() {
-  const { sesiId } = useParams<{ sesiId: string }>();
+  const { quizId } = useParams<{ quizId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
 
-  const id = Number(sesiId);
+  const id = Number(quizId);
 
   const [currentSoalIndex, setCurrentSoalIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
@@ -24,21 +24,21 @@ export function QuizTakingPage() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordVerified, setPasswordVerified] = useState(false);
 
-  const { data: sesi, isLoading: loadingSesi, error: errorSesi } = useQuery({
-    queryKey: ['sesi', id],
+  const { data: quiz, isLoading: loadingQuiz, error: errorQuiz } = useQuery({
+    queryKey: ['quiz', id],
     queryFn: () => quizApi.getById(id),
     enabled: !!id,
   });
 
   const { data: soalList, isLoading: loadingSoal } = useQuery({
-    queryKey: ['sesi', id, 'soal'],
+    queryKey: ['quiz', id, 'soal'],
     queryFn: () => quizApi.getSoal(id),
-    enabled: !!id && sesi?.status === 'active' && !quizCompleted && passwordVerified,
+    enabled: !!id && quiz?.status === 'active' && !quizCompleted && passwordVerified,
   });
 
   const handleVerifyPassword = () => {
-    if (!sesi) return;
-    if (passwordInput === sesi.password) {
+    if (!quiz) return;
+    if (passwordInput === quiz.password) {
       setPasswordVerified(true);
       setPasswordError('');
     } else {
@@ -79,7 +79,7 @@ export function QuizTakingPage() {
     navigate(-1);
   };
 
-  if (loadingSesi || (loadingSoal && passwordVerified)) {
+  if (loadingQuiz || (loadingSoal && passwordVerified)) {
     return (
       <div className="min-h-screen bg-surface-alt">
         <Navbar />
@@ -90,14 +90,14 @@ export function QuizTakingPage() {
     );
   }
 
-  if (errorSesi || !sesi) {
+  if (errorQuiz || !quiz) {
     return (
       <div className="min-h-screen bg-surface-alt">
         <Navbar />
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center gap-2 p-4 bg-danger-50 text-danger rounded-lg">
             <AlertCircle size={18} />
-            Gagal memuat data sesi.
+            Gagal memuat data quiz.
           </div>
         </div>
       </div>
@@ -105,7 +105,7 @@ export function QuizTakingPage() {
   }
 
   // Password gate — must enter password before quiz starts
-  if (!passwordVerified && sesi.password) {
+  if (!passwordVerified && quiz.password) {
     return (
       <div className="min-h-screen bg-surface-alt">
         <Navbar />
@@ -115,7 +115,7 @@ export function QuizTakingPage() {
               <Lock size={32} className="text-primary" />
             </div>
             <h2 className="text-xl font-bold text-text">Masukkan Password Quiz</h2>
-            <p className="text-text-muted mt-2 text-sm">Sesi &quot;{sesi.nama}&quot; memerlukan password untuk memulai.</p>
+            <p className="text-text-muted mt-2 text-sm">Quiz &quot;{quiz.nama}&quot; memerlukan password untuk memulai.</p>
           </div>
           <div className="card">
             <label className="block text-sm font-medium text-text mb-2">Password</label>
@@ -148,7 +148,7 @@ export function QuizTakingPage() {
   }
 
   // Not active yet
-  if (!isSessionActive(sesi)) {
+  if (!isQuizActive(quiz)) {
     return (
       <div className="min-h-screen bg-surface-alt">
         <Navbar />
@@ -159,8 +159,8 @@ export function QuizTakingPage() {
           </Link>
           <div className="card text-center py-12">
             <Clock size={48} className="mx-auto text-warning mb-4" />
-            <h2 className="text-xl font-bold text-text mb-2">Sesi Belum Aktif</h2>
-            <p className="text-text-muted mb-4">Sesi &quot;{sesi.nama}&quot; belum diaktifkan oleh admin.</p>
+            <h2 className="text-xl font-bold text-text mb-2">Quiz Belum Aktif</h2>
+            <p className="text-text-muted mb-4">Quiz &quot;{quiz.nama}&quot; belum diaktifkan oleh admin.</p>
           </div>
         </div>
       </div>
@@ -197,8 +197,8 @@ export function QuizTakingPage() {
   }
 
   // Kelompok type - admin records which soal answered correctly
-  if (sesi.tipe === 'kelompok') {
-    return <KelompokQuizView sesiId={id} soalList={soalList ?? []} kelompokId={user?.kelompok_id ?? 0} />;
+  if (quiz.tipe === 'kelompok') {
+    return <KelompokQuizView quizId={id} soalList={soalList ?? []} kelompokId={user?.kelompok_id ?? 0} />;
   }
 
   // Individual type - show questions
@@ -217,7 +217,7 @@ export function QuizTakingPage() {
           </button>
           <div className="card text-center py-12">
             <AlertCircle size={32} className="mx-auto text-warning mb-3" />
-            <p className="text-text-muted">Tidak ada soal untuk sesi ini.</p>
+            <p className="text-text-muted">Tidak ada soal untuk quiz ini.</p>
           </div>
         </div>
       </div>
@@ -235,7 +235,7 @@ export function QuizTakingPage() {
 
         <div className="card">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-text">{sesi.nama}</h2>
+            <h2 className="text-xl font-bold text-text">{quiz.nama}</h2>
             <span className="badge-primary">{currentSoalIndex + 1}/{totalSoal}</span>
           </div>
 
@@ -331,7 +331,7 @@ export function QuizTakingPage() {
   );
 }
 
-function KelompokQuizView({ sesiId, soalList, kelompokId }: { sesiId: number; soalList: Soal[]; kelompokId: number }) {
+function KelompokQuizView({ quizId, soalList, kelompokId }: { quizId: number; soalList: Soal[]; kelompokId: number }) {
   const queryClient = useQueryClient();
   const [pesertaId, setPesertaId] = useState('');
   const [submittedSoals, setSubmittedSoals] = useState<Set<number>>(new Set());
@@ -343,7 +343,7 @@ function KelompokQuizView({ sesiId, soalList, kelompokId }: { sesiId: number; so
       return;
     }
     try {
-      await quizApi.kelompokAnswer(sesiId, {
+      await quizApi.kelompokAnswer(quizId, {
         kelompok_id: kelompokId,
         soal_id: soalId,
         peserta_id: Number(pesertaId),

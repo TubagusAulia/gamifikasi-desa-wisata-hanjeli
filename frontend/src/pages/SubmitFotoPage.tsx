@@ -17,26 +17,26 @@ export function SubmitFotoPage() {
     queryFn: () => locationApi.getCurrentQuiz(),
   });
 
-  const sesiId = currentQuiz?.sesi_id ?? null;
+  const quizId = currentQuiz?.quiz_id ?? null;
   const canUpload = !!currentQuiz && currentQuiz.is_time_valid && user?.role === 'peserta';
   const isWorker = user?.role !== 'peserta';
 
   const { data: leaderboard, isLoading: leaderboardLoading } = useQuery<PhotoLeaderboardEntry[]>({
-    queryKey: ['photo-leaderboard', sesiId],
-    queryFn: () => photoApi.getLeaderboard(sesiId as number),
-    enabled: sesiId !== null,
+    queryKey: ['photo-leaderboard', quizId],
+    queryFn: () => photoApi.getLeaderboard(quizId as number),
+    enabled: quizId !== null,
   });
 
   const { data: submissions, isLoading: submissionsLoading } = useQuery<PhotoSubmission[]>({
-    queryKey: ['photo-submissions', sesiId],
-    queryFn: () => photoApi.getGallery(sesiId as number),
-    enabled: sesiId !== null,
+    queryKey: ['photo-submissions', quizId],
+    queryFn: () => photoApi.getGallery(quizId as number),
+    enabled: quizId !== null,
   });
 
   const topEntries = useMemo(() => leaderboard?.slice(0, 3) ?? [], [leaderboard]);
 
   const handleRefresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['photo-leaderboard', sesiId] });
+    await queryClient.invalidateQueries({ queryKey: ['photo-leaderboard', quizId] });
     await queryClient.invalidateQueries({ queryKey: ['current-quiz'] });
   };
 
@@ -44,7 +44,7 @@ export function SubmitFotoPage() {
     if (canUpload) {
       return (
         <PhotoUploader
-          sesiId={currentQuiz.sesi_id}
+          quizId={currentQuiz.quiz_id}
           pesertaId={user.id}
           lokasiPosId={currentQuiz.pos_id}
           onUploaded={handleRefresh}
@@ -102,14 +102,14 @@ export function SubmitFotoPage() {
 
       return (
         <div className="rounded-xl border border-border-dashed bg-surface-alt p-6 text-center text-text-muted">
-          <p className="text-sm">Belum ada foto yang diunggah untuk sesi ini.</p>
+          <p className="text-sm">Belum ada foto yang diunggah untuk quiz ini.</p>
         </div>
       );
     }
 
     return (
       <div className="rounded-xl border border-warning/20 bg-warning-50 p-4 text-sm text-warning-dark">
-        Sesi belum aktif atau berada di luar waktu aktif. Coba kembali ketika sesi sudah aktif.
+        Quiz belum aktif atau berada di luar waktu aktif. Coba kembali ketika quiz sudah aktif.
       </div>
     );
   })();
@@ -151,7 +151,7 @@ export function SubmitFotoPage() {
         {!isQuizLoading && !currentQuiz && (
           <div className="card p-8 text-center mb-6">
             <Camera size={36} className="mx-auto text-text-muted mb-4" />
-            <h2 className="text-xl font-semibold text-text mb-2">Tidak ada sesi aktif di lokasi Anda</h2>
+            <h2 className="text-xl font-semibold text-text mb-2">Tidak ada quiz aktif di lokasi Anda</h2>
             <p className="text-text-muted mb-4">Pastikan Anda berada di dalam radius POS yang aktif untuk dapat mengunggah foto.</p>
             <Link to="/peta" className="btn-primary">Kembali ke Peta</Link>
           </div>
@@ -167,7 +167,7 @@ export function SubmitFotoPage() {
                   </div>
                   <div>
                     <h2 className="text-xl font-semibold text-text">Unggah Foto</h2>
-                    <p className="text-sm text-text-muted">Sesi: {currentQuiz.sesi_nama} · Pos: {currentQuiz.pos_nama}</p>
+                    <p className="text-sm text-text-muted">Quiz: {currentQuiz.quiz_nama} · Pos: {currentQuiz.pos_nama}</p>
                   </div>
                 </div>
 
@@ -240,7 +240,7 @@ export function SubmitFotoPage() {
                 ) : (
                   <div className="rounded-xl border border-border-dashed bg-surface-alt p-6 text-center text-text-muted">
                     <CheckCircle size={24} className="mx-auto mb-3 text-text-muted" />
-                    <p className="text-sm">Belum ada pengumpulan foto untuk sesi ini.</p>
+                    <p className="text-sm">Belum ada pengumpulan foto untuk quiz ini.</p>
                   </div>
                 )}
               </div>

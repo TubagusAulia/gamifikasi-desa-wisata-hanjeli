@@ -6,7 +6,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { photoUploadSchema, validatePhotoSchema } = require('../utils/schemas');
 const upload = require('../middleware/upload');
-const { processPhoto, detectFace } = require('../utils/photoProcessor');
+const { processPhoto } = require('../utils/photoProcessor');
 
 const router = express.Router();
 
@@ -16,15 +16,15 @@ const router = express.Router();
 router.post('/upload', authenticate, authorize('peserta'), upload.single('file'), asyncHandler(async (req, res) => {
   if (!req.file) throw new ApiError(400, 'No file uploaded');
 
-  const { peserta_id, sesi_id, lokasi_pos_id, caption } = req.body;
-  if (!peserta_id || !sesi_id || !lokasi_pos_id) {
-    throw new ApiError(400, 'peserta_id, sesi_id, and lokasi_pos_id are required');
+  const { peserta_id, quiz_id, lokasi_pos_id, caption } = req.body;
+  if (!peserta_id || !quiz_id || !lokasi_pos_id) {
+    throw new ApiError(400, 'peserta_id, quiz_id, and lokasi_pos_id are required');
   }
   if (req.user.id !== Number.parseInt(peserta_id, 10)) {
     throw new ApiError(403, 'Can only upload your own photo');
   }
 
-  const { buffer, hash } = await processPhoto(req.file.buffer, req.file.mimetype);
+  const { hash } = await processPhoto(req.file.buffer, req.file.mimetype);
 
   // Check duplicate
   const [dup] = await pool.execute(
@@ -33,17 +33,14 @@ router.post('/upload', authenticate, authorize('peserta'), upload.single('file')
   );
   if (dup.length > 0) throw new ApiError(409, 'Duplicate photo detected');
 
-  // Face detection (mock)
-  const faceResult = await detectFace(buffer);
-
   // Save to DB (foto_url stores local path)
-  const fileName = `sesi_${sesi_id}/peserta_${peserta_id}/${Date.now()}.jpg`;
+  const fileName = `quiz_${quiz_id}/peserta_${peserta_id}/${Date.now()}.jpg`;
   const fotoUrl = `/uploads/${fileName}`;
 
   const [result] = await pool.execute(
-    `INSERT INTO submission_aktivitas (peserta_id, sesi_id, lokasi_pos_id, foto_url, foto_hash, caption, submission_lat, submission_lon, validasi_status, poin_diberikan)
+    `INSERT INTO submission_aktivitas (peserta_id, quiz_id, lokasi_pos_id, foto_url, foto_hash, caption, submission_lat, submission_lon, validasi_status, poin_diberikan)
      VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 'pending', 0)`,
-    [peserta_id, sesi_id, lokasi_pos_id, fotoUrl, hash, caption || null]
+    [peserta_id, quiz_id, lokasi_pos_id, fotoUrl, hash, caption || null]
   );
 
   const io = req.app.get('io');
@@ -51,7 +48,7 @@ router.post('/upload', authenticate, authorize('peserta'), upload.single('file')
     io.emit('photo_submitted', {
       submission_id: result.insertId,
       peserta_id: Number.parseInt(peserta_id, 10),
-      sesi_id: Number.parseInt(sesi_id, 10),
+      quiz_id: Number.parseInt(quiz_id, 10),
       lokasi_pos_id: Number.parseInt(lokasi_pos_id, 10),
       foto_url: fotoUrl,
       timestamp: new Date().toISOString(),
@@ -64,8 +61,6 @@ router.post('/upload', authenticate, authorize('peserta'), upload.single('file')
       submission_id: result.insertId,
       status: 'pending',
       foto_url: fotoUrl,
-      face_detected: faceResult.hasFace,
-      face_confidence: faceResult.confidence,
       poin_granted: 0,
       message: 'Photo uploaded successfully. Awaiting validation.',
     },
@@ -78,7 +73,7 @@ router.post('/upload', authenticate, authorize('peserta'), upload.single('file')
 router.get('/submission/:id', authenticate, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const [rows] = await pool.execute(
-    `SELECT sa.id, sa.peserta_id, sa.sesi_id, sa.lokasi_pos_id, sa.foto_url, sa.foto_hash,
+    `SELECT sa.id, sa.peserta_id, sa.quiz_id, sa.lokasi_pos_id, sa.foto_url, sa.foto_hash,
             sa.caption, sa.submission_lat, sa.submission_lon, sa.validasi_status, sa.validasi_note,
             sa.poin_diberikan, sa.created_at, sa.updated_at, p.nama, p.email, lp.nama_pos
      FROM submission_aktivitas sa
@@ -123,10 +118,10 @@ router.put('/submission/:id/validate', authenticate, authorize('admin', 'worker'
   // Update progress
   if (validasi_status === 'valid') {
     await pool.execute(
-      `INSERT INTO progress_peserta (peserta_id, sesi_id, lokasi_pos_id, status_completion, photo_submitted, completion_time)
+      `INSERT INTO progress_peserta (peserta_id, quiz_id, lokasi_pos_id, status_completion, photo_submitted, completion_time)
        VALUES (?, ?, ?, 'photo_done', TRUE, NOW())
        ON DUPLICATE KEY UPDATE status_completion = 'photo_done', photo_submitted = TRUE, completion_time = NOW()`,
-      [current[0].peserta_id, current[0].sesi_id, current[0].lokasi_pos_id]
+      [current[0].peserta_id, current[0].quiz_id, current[0].lokasi_pos_id]
     );
   }
 
@@ -134,7 +129,7 @@ router.put('/submission/:id/validate', authenticate, authorize('admin', 'worker'
   if (io) {
     io.emit('leaderboard_updated', {
       peserta_id: current[0].peserta_id,
-      sesi_id: current[0].sesi_id,
+      quiz_id: current[0].quiz_id,
       action: validasi_status === 'valid' ? 'photo_validated' : 'photo_rejected',
       poin,
       timestamp: new Date().toISOString(),
@@ -153,18 +148,18 @@ router.put('/submission/:id/validate', authenticate, authorize('admin', 'worker'
 }));
 
 /**
- * GET /api/photo/gallery/:sesi_id
+ * GET /api/photo/gallery/:quiz_id
  */
-router.get('/gallery/:sesi_id', authenticate, asyncHandler(async (req, res) => {
-  const { sesi_id } = req.params;
-  let sql = `SELECT sa.id, sa.peserta_id, sa.sesi_id, sa.lokasi_pos_id, sa.foto_url, sa.caption,
+router.get('/gallery/:quiz_id', authenticate, asyncHandler(async (req, res) => {
+  const { quiz_id } = req.params;
+  let sql = `SELECT sa.id, sa.peserta_id, sa.quiz_id, sa.lokasi_pos_id, sa.foto_url, sa.caption,
                     sa.validasi_status, sa.poin_diberikan, sa.created_at, p.nama, lp.nama_pos
              FROM submission_aktivitas sa
              LEFT JOIN peserta p ON sa.peserta_id = p.id
              LEFT JOIN lokasi_pos lp ON sa.lokasi_pos_id = lp.id
-             WHERE sa.sesi_id = ?
+             WHERE sa.quiz_id = ?
              ORDER BY sa.created_at DESC`;
-  const params = [sesi_id];
+  const params = [quiz_id];
 
   if (req.user.role === 'peserta') {
     sql += ' AND sa.peserta_id = ?';
@@ -176,10 +171,10 @@ router.get('/gallery/:sesi_id', authenticate, asyncHandler(async (req, res) => {
 }));
 
 /**
- * GET /api/photo/leaderboard/:sesi_id - leaderboard for photo submissions in a sesi
+ * GET /api/photo/leaderboard/:quiz_id - leaderboard for photo submissions in a quiz
  */
-router.get('/leaderboard/:sesi_id', authenticate, asyncHandler(async (req, res) => {
-  const { sesi_id } = req.params;
+router.get('/leaderboard/:quiz_id', authenticate, asyncHandler(async (req, res) => {
+  const { quiz_id } = req.params;
 
   const [rows] = await pool.execute(
     `SELECT sa.peserta_id, p.nama,
@@ -188,10 +183,10 @@ router.get('/leaderboard/:sesi_id', authenticate, asyncHandler(async (req, res) 
             SUM(sa.validasi_status = 'valid') AS valid_count
      FROM submission_aktivitas sa
      LEFT JOIN peserta p ON sa.peserta_id = p.id
-     WHERE sa.sesi_id = ?
+     WHERE sa.quiz_id = ?
      GROUP BY sa.peserta_id, p.nama
      ORDER BY total_poin DESC, valid_count DESC, submission_count ASC`,
-    [sesi_id]
+    [quiz_id]
   );
 
   const leaderboard = rows.map((row, index) => ({

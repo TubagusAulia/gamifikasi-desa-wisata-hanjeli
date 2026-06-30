@@ -50,7 +50,7 @@ function App() {
         <Route path="/leaderboard/:type/:id" element={<ProtectedRoute roles={['admin', 'worker']}><LeaderboardPage /></ProtectedRoute>} />
 
         {/* Quiz detail — admin & worker only */}
-        <Route path="/quiz/:id" element={<ProtectedRoute roles={['admin', 'worker']}><QuizDetailPage /></ProtectedRoute>} />
+        <Route path="/agenda/:id" element={<ProtectedRoute roles={['admin', 'worker']}><QuizDetailPage /></ProtectedRoute>} />
 
         {/* Quiz start — all roles (landing page before entering quiz) */}
         <Route path="/quiz/start" element={<ProtectedRoute><QuizStartPage /></ProtectedRoute>} />
@@ -59,7 +59,7 @@ function App() {
         <Route path="/collection/:id" element={<ProtectedRoute roles={['admin', 'worker']}><CollectionDetailPage /></ProtectedRoute>} />
 
         {/* Quiz taking — all roles (peserta takes, admin/worker can preview) */}
-        <Route path="/quiz/take/:sesiId" element={<ProtectedRoute><QuizTakingPage /></ProtectedRoute>} />
+        <Route path="/quiz/take/:quizId" element={<ProtectedRoute><QuizTakingPage /></ProtectedRoute>} />
 
         {/* Peta — all roles */}
         <Route path="/peta" element={<ProtectedRoute><PetaPage /></ProtectedRoute>} />

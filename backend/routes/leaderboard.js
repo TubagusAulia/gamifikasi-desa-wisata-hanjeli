@@ -7,17 +7,17 @@ const { authenticate } = require('../middleware/auth');
 const router = express.Router();
 
 /**
- * GET /api/leaderboard/sesi/:sesi_id - leaderboard for a specific sesi
- * Returns the leaderboard JSON stored on sesi
+ * GET /api/leaderboard/quiz/:quiz_id - leaderboard for a specific quiz
+ * Returns the leaderboard JSON stored on quiz
  */
-router.get('/sesi/:sesi_id', authenticate, asyncHandler(async (req, res) => {
-  const { sesi_id } = req.params;
+router.get('/quiz/:quiz_id', authenticate, asyncHandler(async (req, res) => {
+  const { quiz_id } = req.params;
 
-  const [sesiRows] = await pool.execute('SELECT id, quiz_id, nama, tipe, leaderboard FROM sesi WHERE id = ?', [sesi_id]);
-  if (sesiRows.length === 0) throw new ApiError(404, 'Sesi not found');
+  const [quizRows] = await pool.execute('SELECT id, agenda_id, nama, tipe, leaderboard FROM quiz WHERE id = ?', [quiz_id]);
+  if (quizRows.length === 0) throw new ApiError(404, 'Quiz not found');
 
-  const sesi = sesiRows[0];
-  const leaderboard = sesi.leaderboard ? JSON.parse(sesi.leaderboard) : {};
+  const quiz = quizRows[0];
+  const leaderboard = quiz.leaderboard ? JSON.parse(quiz.leaderboard) : {};
 
   // Remove internal tracking field
   delete leaderboard._answeredSoals;
@@ -32,34 +32,34 @@ router.get('/sesi/:sesi_id', authenticate, asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: {
-      sesi: { id: sesi.id, nama: sesi.nama, tipe: sesi.tipe, quiz_id: sesi.quiz_id },
+      quiz: { id: quiz.id, nama: quiz.nama, tipe: quiz.tipe, agenda_id: quiz.agenda_id },
       leaderboard: entries,
     },
   });
 }));
 
 /**
- * GET /api/leaderboard/quiz/:quiz_id - leaderboard for entire quiz
- * Merges leaderboard JSONs from all sesi in the quiz
+ * GET /api/leaderboard/agenda/:agenda_id - leaderboard for entire agenda
+ * Merges leaderboard JSONs from all quiz in the agenda
  */
-router.get('/quiz/:quiz_id', authenticate, asyncHandler(async (req, res) => {
-  const { quiz_id } = req.params;
+router.get('/agenda/:agenda_id', authenticate, asyncHandler(async (req, res) => {
+  const { agenda_id } = req.params;
 
-  const [quizRows] = await pool.execute('SELECT id, nama FROM quiz WHERE id = ?', [quiz_id]);
-  if (quizRows.length === 0) throw new ApiError(404, 'Quiz not found');
+  const [agendaRows] = await pool.execute('SELECT id, nama FROM agenda WHERE id = ?', [agenda_id]);
+  if (agendaRows.length === 0) throw new ApiError(404, 'Agenda not found');
 
-  const [sesiRows] = await pool.execute('SELECT id, nama, tipe, leaderboard FROM sesi WHERE quiz_id = ?', [quiz_id]);
+  const [quizRows] = await pool.execute('SELECT id, nama, tipe, leaderboard FROM quiz WHERE agenda_id = ?', [agenda_id]);
 
   // Merge all leaderboard JSONs
   const scoreMap = {};
-  for (const sesi of sesiRows) {
-    if (!sesi.leaderboard) continue;
-    const lb = JSON.parse(sesi.leaderboard);
+  for (const quiz of quizRows) {
+    if (!quiz.leaderboard) continue;
+    const lb = JSON.parse(quiz.leaderboard);
     delete lb._answeredSoals;
     for (const [key, entry] of Object.entries(lb)) {
       if (!scoreMap[key]) scoreMap[key] = { nama: entry.nama, skor: 0 };
       scoreMap[key].skor += entry.skor || 0;
-      if (sesi.tipe === 'kelompok') scoreMap[key].kelompok_id = parseInt(key);
+      if (quiz.tipe === 'kelompok') scoreMap[key].kelompok_id = parseInt(key);
     }
   }
 
@@ -74,7 +74,7 @@ router.get('/quiz/:quiz_id', authenticate, asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: {
-      quiz: quizRows[0],
+      agenda: agendaRows[0],
       leaderboard,
     },
   });

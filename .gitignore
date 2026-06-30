@@ -31,6 +31,10 @@ ansible/
 *.vault.yml
 .vault_pass
 
+# SonarLint / SonarCloud IDE integration (per-workspace, not committed)
+.sonarlint/
+sonar-project.properties
+
 # Editor & OS
 .DS_Store
 .vscode/

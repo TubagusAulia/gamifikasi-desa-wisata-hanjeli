@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { agendaApi, kelompokApi } from '@/services/api';
 import { Navbar } from '@/components/Navbar';
 import { BookOpen, Play, Loader2, AlertCircle, CheckCircle, Clock } from 'lucide-react';
-import { isSessionActive } from '@/utils/session';
+import { isQuizActive } from '@/utils/session';
 import type { Agenda, QuizSession } from '@/types';
 
 export function PesertaAgendaPage() {
@@ -26,7 +26,7 @@ export function PesertaAgendaPage() {
   });
 
   const handleStartQuiz = (s: QuizSession) => {
-    navigate('/quiz/start', { state: { sesiId: s.id } });
+    navigate('/quiz/start', { state: { quizId: s.id } });
   };
 
   const isLoading = loadingKelompok || loadingQuiz;
@@ -63,11 +63,11 @@ export function PesertaAgendaPage() {
                   </div>
                 </div>
 
-                {/* Quiz list (sesi) */}
-                {agenda.sesi && agenda.sesi.length > 0 ? (
+                {/* Quiz list */}
+                {agenda.quiz && agenda.quiz.length > 0 ? (
                   <div className="space-y-2 mt-4 pt-4 border-t border-border-light">
                     <p className="text-sm font-medium text-text mb-2">Quiz Tersedia:</p>
-                    {agenda.sesi.map((s) => (
+                    {agenda.quiz.map((s) => (
                       <div
                         key={s.id}
                         className="flex items-center justify-between p-3 bg-surface-alt rounded-lg border border-border-light"
@@ -77,13 +77,13 @@ export function PesertaAgendaPage() {
                             <p className="text-sm font-medium text-text">{s.nama}</p>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                isSessionActive(s)
+                                isQuizActive(s)
                                   ? 'bg-success-50 text-success-dark'
                                   : s.status === 'completed'
                                   ? 'bg-gray-100 text-text-muted'
                                   : 'bg-warning-50 text-warning-dark'
                               }`}>
-                                {isSessionActive(s) ? 'Aktif' : s.status === 'completed' ? 'Selesai' : 'Belum Aktif'}
+                                {isQuizActive(s) ? 'Aktif' : s.status === 'completed' ? 'Selesai' : 'Belum Aktif'}
                               </span>
                               <span className="text-xs text-text-muted">
                                 {s.tipe === 'kelompok' ? 'Kelompok' : 'Individu'}
@@ -91,7 +91,7 @@ export function PesertaAgendaPage() {
                             </div>
                           </div>
                         </div>
-                        {isSessionActive(s) ? (
+                        {isQuizActive(s) ? (
                           <button
                             onClick={() => handleStartQuiz(s)}
                             className="btn-success text-sm flex items-center gap-1"

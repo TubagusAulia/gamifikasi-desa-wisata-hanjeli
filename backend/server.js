@@ -14,13 +14,13 @@ const locationRoutes = require('./routes/location');
 const photoRoutes = require('./routes/photo');
 const mapRoutes = require('./routes/map');
 const progressRoutes = require('./routes/progress');
-const quizRoutes = require('./routes/quiz');
+const agendaRoutes = require('./routes/agenda');
 const workersRoutes = require('./routes/workers');
 const leaderboardRoutes = require('./routes/leaderboard');
 const adminRoutes = require('./routes/admin');
 const healthRoutes = require('./routes/health');
 const kelompokRoutes = require('./routes/kelompok');
-const sesiRoutes = require('./routes/sesi');
+const quizRoutes = require('./routes/quiz');
 const daftarSoalRoutes = require('./routes/daftarSoal');
 const posRoutes = require('./routes/pos');
 const reviewRoutes = require('./routes/review');
@@ -77,13 +77,13 @@ app.use('/api/location', locationRoutes);
 app.use('/api/photo', photoRoutes);
 app.use('/api/map', mapRoutes);
 app.use('/api/progress', progressRoutes);
-app.use('/api/quiz', quizRoutes);
+app.use('/api/agenda', agendaRoutes);
 app.use('/api/workers', workersRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/kelompok', kelompokRoutes);
-app.use('/api/sesi', sesiRoutes);
+app.use('/api/quiz', quizRoutes);
 app.use('/api/daftar-soal', daftarSoalRoutes);
 app.use('/api/pos', posRoutes);
 app.use('/api/review', reviewRoutes);
@@ -97,9 +97,9 @@ io.on('connection', (socket) => {
   console.log(`[Socket.io] Client connected: ${socket.id}`);
 
   // Join room for session tracking
-  socket.on('join-session', (sesi_id) => {
-    socket.join(`session-${sesi_id}`);
-    console.log(`[Socket.io] ${socket.id} joined session-${sesi_id}`);
+  socket.on('join-session', (quiz_id) => {
+    socket.join(`session-${quiz_id}`);
+    console.log(`[Socket.io] ${socket.id} joined session-${quiz_id}`);
   });
 
   // Join room for admin dashboard

@@ -9,6 +9,39 @@ const { haversineDistance } = require('../utils/haversine');
 
 const router = express.Router();
 
+let insidePosId = null;
+let insidePosNama = null;
+let insideDistance = null;
+
+async function findInsidePos(lat, lon) {
+  const [posRows] = await pool.execute('SELECT id, nama, latitude, longitude, radius_meter FROM pos');
+  for (const p of posRows) {
+    const pos = { id: p.id, nama: p.nama, latitude: parseFloat(p.latitude), longitude: parseFloat(p.longitude), radius_meter: p.radius_meter };
+    const distance = haversineDistance(lat, lon, pos.latitude, pos.longitude);
+    if (distance <= (pos.radius_meter || 50)) {
+      return { id: pos.id, nama: pos.nama, distance: Math.round(distance) };
+    }
+  }
+  return null;
+}
+
+async function getPrevPosId(peserta_id) {
+  const [prevRows] = await pool.execute('SELECT inside_pos_id FROM lokasi_peserta WHERE peserta_id = ? LIMIT 1', [peserta_id]);
+  return prevRows.length > 0 ? prevRows[0].inside_pos_id : null;
+}
+
+function broadcastLocation(io, data) {
+  io.emit('location-update', { ...data, timestamp: new Date().toISOString() });
+}
+
+function broadcastEnterEvent(io, data) {
+  io.emit('peserta_entered_pos', { ...data, timestamp: new Date().toISOString() });
+}
+
+function broadcastExitEvent(io, data) {
+  io.emit('peserta_exited_pos', { ...data, timestamp: new Date().toISOString() });
+}
+
 /**
  * POST /api/location/update - update peserta location (peserta)
  * Body: { peserta_id, lat, lon, accuracy }
@@ -19,51 +52,19 @@ const router = express.Router();
 router.post('/update', authenticate, authorize('peserta', 'worker'), validate(updateLocationSchema), asyncHandler(async (req, res) => {
   const { peserta_id, lat, lon, accuracy } = req.body;
 
-  // Ensure peserta/worker only updates their own location
   if (req.user.id !== peserta_id) {
     throw new ApiError(403, 'Can only update your own location');
   }
 
-  // Get all pos
-  const [posRows] = await pool.execute(
-    'SELECT id, nama, latitude, longitude, radius_meter FROM pos'
-  );
-  const posList = posRows.map(p => ({
-    id: p.id,
-    nama: p.nama,
-    latitude: parseFloat(p.latitude),
-    longitude: parseFloat(p.longitude),
-    radius_meter: p.radius_meter,
-  }));
+  const inside = await findInsidePos(lat, lon);
+  insidePosId = inside?.id ?? null;
+  insidePosNama = inside?.nama ?? null;
+  insideDistance = inside?.distance ?? null;
 
-  // Check if inside any pos using haversine
-  let insidePosId = null;
-  let insidePosNama = null;
-  let insideDistance = null;
+  const prevPosId = await getPrevPosId(peserta_id);
+  const enterEvent = insidePosId && insidePosId !== prevPosId;
+  const exitEvent = !insidePosId && prevPosId;
 
-  for (const pos of posList) {
-    const distance = haversineDistance(lat, lon, pos.latitude, pos.longitude);
-    if (distance <= (pos.radius_meter || 50)) {
-      insidePosId = pos.id;
-      insidePosNama = pos.nama;
-      insideDistance = Math.round(distance);
-      break;
-    }
-  }
-
-  // Get previous location
-  const [prevRows] = await pool.execute(
-    'SELECT id, inside_pos_id FROM lokasi_peserta WHERE peserta_id = ? LIMIT 1',
-    [peserta_id]
-  );
-  const prevPosId = prevRows.length > 0 ? prevRows[0].inside_pos_id : null;
-
-  let enterEvent = false;
-  let exitEvent = false;
-  if (insidePosId && insidePosId !== prevPosId) enterEvent = true;
-  else if (!insidePosId && prevPosId) exitEvent = true;
-
-  // Upsert lokasi_peserta
   await pool.execute(
     `INSERT INTO lokasi_peserta (peserta_id, latitude, longitude, accuracy_meter, inside_pos_id, last_updated)
      VALUES (?, ?, ?, ?, ?, NOW())
@@ -72,32 +73,11 @@ router.post('/update', authenticate, authorize('peserta', 'worker'), validate(up
     [peserta_id, lat, lon, accuracy || null, insidePosId]
   );
 
-  // Broadcast via socket.io
   const io = req.app.get('io');
   if (io) {
-    io.emit('location-update', {
-      peserta_id,
-      lat,
-      lon,
-      accuracy: accuracy || null,
-      inside_pos_id: insidePosId,
-      timestamp: new Date().toISOString(),
-    });
-    if (enterEvent) {
-      io.emit('peserta_entered_pos', {
-        peserta_id,
-        pos_id: insidePosId,
-        pos_nama: insidePosNama,
-        timestamp: new Date().toISOString(),
-      });
-    }
-    if (exitEvent) {
-      io.emit('peserta_exited_pos', {
-        peserta_id,
-        pos_id: prevPosId,
-        timestamp: new Date().toISOString(),
-      });
-    }
+    broadcastLocation(io, { peserta_id, lat, lon, accuracy: accuracy || null, inside_pos_id: insidePosId });
+    if (enterEvent) broadcastEnterEvent(io, { peserta_id, pos_id: insidePosId, pos_nama: insidePosNama });
+    if (exitEvent) broadcastExitEvent(io, { peserta_id, pos_id: prevPosId });
   }
 
   res.json({
@@ -142,107 +122,100 @@ router.get('/nearby-pos', authenticate, validate(nearbyPosSchemaV2, 'query'), as
 
 /**
  * GET /api/location/current-quiz - get the active quiz at the user's current POS
- * Returns the sesi (with quiz info, daftar_soal, and pos) for the pos the user is inside
+ * Returns the quiz (with quiz info, daftar_soal, and pos) for the pos the user is inside
  * Query: none (uses req.user.id to look up lokasi_peserta)
  */
+async function findActiveQuizAtPos(posId) {
+  const [quizRows] = await pool.execute(
+    `SELECT q.id AS quiz_id, q.nama AS quiz_nama, q.tipe, q.password, q.waktu_mulai, q.waktu_selesai, q.status,
+            q.daftar_soal_id, q.pos_id,
+            a.id AS agenda_id, a.nama AS agenda_nama,
+            ds.nama AS daftar_soal_nama,
+            p.nama AS pos_nama, p.latitude, p.longitude, p.radius_meter
+     FROM quiz q
+     INNER JOIN agenda a ON q.agenda_id = a.id
+     INNER JOIN daftar_soal ds ON q.daftar_soal_id = ds.id
+     INNER JOIN pos p ON q.pos_id = p.id
+     WHERE q.pos_id = ? AND (q.status = 'active' OR (q.waktu_mulai <= NOW() AND q.waktu_selesai >= NOW()))
+     ORDER BY q.waktu_mulai ASC
+     LIMIT 1`,
+    [posId]
+  );
+  return quizRows[0] || null;
+}
+
+async function isWorkerAssignedToQuiz(pesertaId, agendaId) {
+  const [assignRows] = await pool.execute(
+    `SELECT qw.id FROM agenda_worker qw WHERE qw.peserta_id = ? AND qw.agenda_id = ? LIMIT 1`,
+    [pesertaId, agendaId]
+  );
+  return assignRows.length > 0;
+}
+
+function checkHasSubmitted(quiz) {
+  return (quiz.tipe === 'individu')
+    ? !!lbCache.get(quiz.quiz_id)?.pesertaId
+    : !!lbCache.get(quiz.quiz_id)?.kelompokId;
+}
+
+// Simple in-memory cache for leaderboard lookups within a single request
+const lbCache = new Map();
+
 router.get('/current-quiz', authenticate, authorize('peserta', 'worker'), asyncHandler(async (req, res) => {
   const pesertaId = req.user.id;
 
-  // Get user's current location
   const [locRows] = await pool.execute(
     'SELECT inside_pos_id FROM lokasi_peserta WHERE peserta_id = ?',
     [pesertaId]
   );
 
   if (locRows.length === 0 || !locRows[0].inside_pos_id) {
-    res.json({
-      success: true,
-      data: null,
-      message: 'You are not inside any POS. Please go to a POS to access the quiz.',
-    });
+    res.json({ success: true, data: null, message: 'You are not inside any POS. Please go to a POS to access the quiz.' });
     return;
   }
 
-  const posId = locRows[0].inside_pos_id;
-
-  // Find the active sesi at this POS
-  const [sesiRows] = await pool.execute(
-    `SELECT s.id AS sesi_id, s.nama AS sesi_nama, s.tipe, s.password, s.waktu_mulai, s.waktu_selesai, s.status,
-            s.daftar_soal_id, s.pos_id,
-            q.id AS quiz_id, q.nama AS quiz_nama,
-            ds.nama AS daftar_soal_nama,
-            p.nama AS pos_nama, p.latitude, p.longitude, p.radius_meter
-     FROM sesi s
-     INNER JOIN quiz q ON s.quiz_id = q.id
-     INNER JOIN daftar_soal ds ON s.daftar_soal_id = ds.id
-     INNER JOIN pos p ON s.pos_id = p.id
-     WHERE s.pos_id = ? AND (s.status = 'active' OR (s.waktu_mulai <= NOW() AND s.waktu_selesai >= NOW()))
-     ORDER BY s.waktu_mulai ASC
-     LIMIT 1`,
-    [posId]
-  );
-
-  if (sesiRows.length === 0) {
-    res.json({
-      success: true,
-      data: null,
-      message: 'No active quiz at this POS right now.',
-    });
+  const quiz = await findActiveQuizAtPos(locRows[0].inside_pos_id);
+  if (!quiz) {
+    res.json({ success: true, data: null, message: 'No active quiz at this POS right now.' });
     return;
   }
 
-  const sesi = sesiRows[0];
-
-  if (req.user.role === 'worker') {
-    const [assignRows] = await pool.execute(
-      `SELECT qw.id FROM quiz_worker qw WHERE qw.peserta_id = ? AND qw.quiz_id = ? LIMIT 1`,
-      [pesertaId, sesi.quiz_id]
-    );
-    if (assignRows.length === 0) {
-      res.json({
-        success: true,
-        data: null,
-        message: 'You are not assigned to this quiz.',
-      });
-      return;
-    }
+  if (req.user.role === 'worker' && !await isWorkerAssignedToQuiz(pesertaId, quiz.agenda_id)) {
+    res.json({ success: true, data: null, message: 'You are not assigned to this quiz.' });
+    return;
   }
 
-  // Check if currently within time window
   const now = new Date();
-  const mulai = new Date(String(sesi.waktu_mulai).replace(' ', 'T'));
-  const selesai = new Date(String(sesi.waktu_selesai).replace(' ', 'T'));
+  const mulai = new Date(String(quiz.waktu_mulai).replace(' ', 'T'));
+  const selesai = new Date(String(quiz.waktu_selesai).replace(' ', 'T'));
   const isTimeValid = now >= mulai && now <= selesai;
 
-  // Check if user already submitted
-  let hasSubmitted = false;
-  const [lbRows] = await pool.execute('SELECT leaderboard FROM sesi WHERE id = ?', [sesi.sesi_id]);
+  const [lbRows] = await pool.execute('SELECT leaderboard FROM quiz WHERE id = ?', [quiz.quiz_id]);
   const lb = lbRows[0]?.leaderboard ? JSON.parse(lbRows[0].leaderboard) : {};
-  if (sesi.tipe === 'individu') {
-    hasSubmitted = !!lb[pesertaId];
-  } else {
-    hasSubmitted = !!lb[req.user.kelompok_id];
-  }
+  lbCache.set(quiz.quiz_id, { pesertaId: lb[pesertaId], kelompokId: lb[req.user.kelompok_id] });
+  const hasSubmitted = checkHasSubmitted(quiz);
 
   res.json({
     success: true,
     data: {
-      sesi_id: sesi.sesi_id,
-      sesi_nama: sesi.sesi_nama,
-      tipe: sesi.tipe,
-        status: sesi.status,      password: sesi.password,
-      waktu_mulai: sesi.waktu_mulai,
-      waktu_selesai: sesi.waktu_selesai,
+      quiz_id: quiz.quiz_id,
+      quiz_nama: quiz.quiz_nama,
+      tipe: quiz.tipe,
+      status: quiz.status,
+      password: quiz.password,
+      waktu_mulai: quiz.waktu_mulai,
+      waktu_selesai: quiz.waktu_selesai,
       is_time_valid: isTimeValid,
       has_submitted: hasSubmitted,
-      quiz_id: sesi.quiz_id,      quiz_nama: sesi.quiz_nama,
-      daftar_soal_id: sesi.daftar_soal_id,
-      daftar_soal_nama: sesi.daftar_soal_nama,
-      pos_id: sesi.pos_id,
-      pos_nama: sesi.pos_nama,
-      latitude: parseFloat(sesi.latitude),
-      longitude: parseFloat(sesi.longitude),
-      radius_meter: sesi.radius_meter,
+      agenda_id: quiz.agenda_id,
+      agenda_nama: quiz.agenda_nama,
+      daftar_soal_id: quiz.daftar_soal_id,
+      daftar_soal_nama: quiz.daftar_soal_nama,
+      pos_id: quiz.pos_id,
+      pos_nama: quiz.pos_nama,
+      latitude: parseFloat(quiz.latitude),
+      longitude: parseFloat(quiz.longitude),
+      radius_meter: quiz.radius_meter,
     },
   });
 }));

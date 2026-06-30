@@ -26,7 +26,7 @@ export function AgendaDetailPage() {
     enabled: !!quizId,
   });
 
-  const quizList = agenda?.sesi;
+  const quizList = agenda?.quiz;
 
   const { data: daftarSoalList } = useQuery({
     queryKey: ['daftar-soal'],
@@ -74,7 +74,7 @@ export function AgendaDetailPage() {
   const createQuizMutation = useMutation({
     mutationFn: quizApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quiz', quizId, 'sesi'] });
+      queryClient.invalidateQueries({ queryKey: ['agenda', quizId, 'quiz'] });
       setShowQuizForm(false);
       setQuizForm({
         nama: '',
@@ -91,12 +91,12 @@ export function AgendaDetailPage() {
     e.preventDefault();
     createQuizMutation.mutate({
       ...quizForm,
-      quiz_id: quizId,
+      agenda_id: quizId,
       tipe: defaultTipe,
     });
   };
 
-  const getStatusBadge = (status: QuizSession['status']) => {
+  const getQuizStatusBadge = (status: QuizSession['status']) => {
     switch (status) {
       case 'active':
         return <span className="badge-success">Aktif</span>;
@@ -231,7 +231,7 @@ export function AgendaDetailPage() {
               </div>
             </div>
 
-            {/* Sesi List */}
+            {/* Quiz List */}
             <div className="card mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-text flex items-center gap-2">
@@ -254,14 +254,14 @@ export function AgendaDetailPage() {
                   <form onSubmit={handleSubmitQuiz} className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <label htmlFor="quiz-nama" className="block text-xs font-medium text-text mb-1">Nama Sesi</label>
+                        <label htmlFor="quiz-nama" className="block text-xs font-medium text-text mb-1">Nama Quiz</label>
                         <input
                           id="quiz-nama"
                           type="text"
                           value={quizForm.nama}
                           onChange={(e) => setQuizForm({ ...quizForm, nama: e.target.value })}
                           className="input-field text-sm"
-                          placeholder="Contoh: Sesi 1"
+                          placeholder="Contoh: Quiz 1"
                           required
                         />
                       </div>
@@ -283,13 +283,13 @@ export function AgendaDetailPage() {
                         </div>
                       </div>
                       <div className="md:col-span-2">
-                        <label htmlFor="quiz-deskripsi" className="block text-xs font-medium text-text mb-1">Deskripsi Sesi</label>
+                        <label htmlFor="quiz-deskripsi" className="block text-xs font-medium text-text mb-1">Deskripsi Quiz</label>
                         <textarea
                           id="quiz-deskripsi"
                           value={quizForm.deskripsi}
                           onChange={(e) => setQuizForm({ ...quizForm, deskripsi: e.target.value })}
                           className="input-field text-sm min-h-[60px]"
-                          placeholder="Deskripsi sesi (opsional)"
+                          placeholder="Deskripsi quiz (opsional)"
                         />
                       </div>
                       <div>
@@ -381,7 +381,7 @@ export function AgendaDetailPage() {
                 </div>
               )}
 
-              {/* Sesi Table */}
+              {/* Quiz Table */}
               {quizList && quizList.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -489,7 +489,7 @@ export function AgendaDetailPage() {
                   </table>
                 </div>
               ) : (
-                <p className="text-text-muted text-center py-4">Belum ada collection foto untuk sesi ini.</p>
+                <p className="text-text-muted text-center py-4">Belum ada collection foto untuk agenda ini.</p>
               )}
             </div>
 

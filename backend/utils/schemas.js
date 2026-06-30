@@ -17,7 +17,7 @@ const registerSchema = z.object({
 // Location schemas
 const updatePositionSchema = z.object({
   peserta_id: z.number().int().positive(),
-  quiz_id: z.number().int().positive(),
+  agenda_id: z.number().int().positive(),
   lat: z.number().min(-90).max(90),
   lon: z.number().min(-180).max(180),
   accuracy: z.number().positive().optional(),
@@ -26,31 +26,13 @@ const updatePositionSchema = z.object({
 const nearbyPosSchema = z.object({
   lat: z.coerce.number().min(-90).max(90),
   lon: z.coerce.number().min(-180).max(180),
-  quiz_id: z.coerce.number().int().positive(),
-});
-
-// Map pos schemas
-const createPosSchema = z.object({
-  sesi_id: z.number().int().positive(),
-  nama_pos: z.string().min(1, 'Pos name is required'),
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
-  radius_meter: z.number().positive().default(50),
-  deskripsi: z.string().optional(),
-});
-
-const updatePosSchema = z.object({
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
-  radius_meter: z.number().positive().optional(),
-  deskripsi: z.string().optional(),
-  nama_pos: z.string().min(1).optional(),
+  agenda_id: z.coerce.number().int().positive(),
 });
 
 // Photo schemas
 const photoUploadSchema = z.object({
   peserta_id: z.coerce.number().int().positive(),
-  sesi_id: z.coerce.number().int().positive(),
+  quiz_id: z.coerce.number().int().positive(),
   lokasi_pos_id: z.coerce.number().int().positive(),
   caption: z.string().max(255).optional(),
 });
@@ -83,20 +65,20 @@ const createKelompokSchema = z.object({
   })).min(1, 'At least one peserta is required'),
 });
 
-// Quiz schemas (v2)
-const createQuizSchema = z.object({
-  nama: z.string().min(1, 'Nama quiz is required').max(255),
+// Agenda schemas (v2)
+const createAgendaSchema = z.object({
+  nama: z.string().min(1, 'Nama agenda is required').max(255),
   deskripsi: z.string().optional(),
   no_phone_policy: z.boolean().optional().default(false),
   kelompok_ids: z.array(z.number().int().positive()).min(1, 'At least one kelompok is required'),
 });
 
-// Sesi schemas
-const createSesiSchema = z.object({
-  quiz_id: z.number().int().positive(),
+// Quiz schemas
+const createQuizSchema = z.object({
+  agenda_id: z.number().int().positive(),
   daftar_soal_id: z.number().int().positive(),
   pos_id: z.number().int().positive(),
-  nama: z.string().min(1, 'Nama sesi is required').max(255),
+  nama: z.string().min(1, 'Nama quiz is required').max(255),
   tipe: z.enum(['individu', 'kelompok']).optional(),
   waktu_mulai: z.string().optional(),
   waktu_selesai: z.string().optional(),
@@ -104,7 +86,7 @@ const createSesiSchema = z.object({
   password: z.string().min(1, 'Password is required').max(255).optional(),
 });
 
-const updateSesiSchema = z.object({
+const updateQuizSchema = z.object({
   nama: z.string().min(1).max(255).optional(),
   tipe: z.enum(['individu', 'kelompok']).optional(),
   waktu_mulai: z.string().optional(),
@@ -114,7 +96,7 @@ const updateSesiSchema = z.object({
   pos_id: z.number().int().positive().optional(),
 });
 
-const activateSesiSchema = z.object({
+const activateQuizSchema = z.object({
   status: z.enum(['active']),
 });
 
@@ -199,18 +181,15 @@ module.exports = {
   loginSchema,
   registerSchema,
   updatePositionSchema,
-  nearbyPosSchema,
-  createPosSchema,
-  updatePosSchema,
+  nearbyPosSchema: nearbyPosSchemaV2,
   photoUploadSchema,
   validatePhotoSchema,
   quizSubmitSchema,
-  // v2
   createKelompokSchema,
+  createAgendaSchema,
   createQuizSchema,
-  createSesiSchema,
-  updateSesiSchema,
-  activateSesiSchema,
+  updateQuizSchema,
+  activateQuizSchema,
   submitJawabanSchema,
   kelompokAnswerSchema,
   createDaftarSoalSchema,
@@ -220,5 +199,4 @@ module.exports = {
   uploadReviewSchema,
   gradeReviewSchema,
   updateLocationSchema,
-  nearbyPosSchemaV2,
 };

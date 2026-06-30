@@ -44,13 +44,13 @@ export interface Agenda {
   status: 'active' | 'inactive';
   created_at: string;
   kelompok?: Kelompok[];
-  sesi?: QuizSession[];
+  quiz?: QuizSession[];
   assigned_workers?: { id: number; nama: string; email: string }[];
 }
 
 export interface QuizSession {
   id: number;
-  quiz_id: number;
+  agenda_id: number;
   daftar_soal_id: number;
   pos_id: number;
   nama: string;
@@ -113,7 +113,7 @@ export interface ReviewSubmission {
 export interface PhotoSubmission {
   id: number;
   peserta_id: number;
-  sesi_id: number;
+  quiz_id: number;
   lokasi_pos_id: number;
   foto_url: string;
   caption?: string;
@@ -145,8 +145,8 @@ export interface LeaderboardEntry {
 }
 
 export interface CurrentQuizData {
-  sesi_id: number;
-  sesi_nama: string;
+  quiz_id: number;
+  quiz_nama: string;
   tipe: 'individu' | 'kelompok';
   status: 'inactive' | 'active' | 'completed';
   password?: string;
@@ -154,8 +154,8 @@ export interface CurrentQuizData {
   waktu_selesai: string;
   is_time_valid: boolean;
   has_submitted: boolean;
-  quiz_id: number;
-  quiz_nama: string;
+  agenda_id: number;
+  agenda_nama: string;
   daftar_soal_id: number;
   daftar_soal_nama: string;
   pos_id: number;

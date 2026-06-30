@@ -1,7 +1,7 @@
 import type { QuizSession } from '@/types';
 
 /**
- * A sesi is "available" (active) when either:
+ * A quiz is "available" (active) when either:
  *  - it was manually forced active via the admin activate toggle (`status === 'active'`), OR
  *  - the current time falls inside its `waktu_mulai` / `waktu_selesai` window.
  *
@@ -9,16 +9,16 @@ import type { QuizSession } from '@/types';
  * Time fields arrive from the DB as 'YYYY-MM-DD HH:mm:ss' — parsing as local time by replacing
  * the space with 'T'.
  */
-export function isSessionActive(
-  sesi?: Pick<QuizSession, 'status' | 'waktu_mulai' | 'waktu_selesai'> | null,
+export function isQuizActive(
+  quiz?: Pick<QuizSession, 'status' | 'waktu_mulai' | 'waktu_selesai'> | null,
 ): boolean {
-  if (!sesi) return false;
+  if (!quiz) return false;
 
   // Explicit manual override takes precedence.
-  if (sesi.status === 'active' || sesi.status === 'completed') return sesi.status === 'active';
+  if (quiz.status === 'active' || quiz.status === 'completed') return quiz.status === 'active';
 
-  const start = sesi.waktu_mulai ? new Date(String(sesi.waktu_mulai).replace(' ', 'T')) : null;
-  const end = sesi.waktu_selesai ? new Date(String(sesi.waktu_selesai).replace(' ', 'T')) : null;
+  const start = quiz.waktu_mulai ? new Date(String(quiz.waktu_mulai).replace(' ', 'T')) : null;
+  const end = quiz.waktu_selesai ? new Date(String(quiz.waktu_selesai).replace(' ', 'T')) : null;
   const now = new Date();
 
   if (start && end) return now >= start && now <= end;

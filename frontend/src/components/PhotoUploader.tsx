@@ -4,13 +4,13 @@ import { Upload, X, Camera, Image as ImageIcon } from 'lucide-react';
 import { photoApi } from '@/services/api';
 
 interface Props {
-  readonly sesiId: number;
+  readonly quizId: number;
   readonly pesertaId: number;
   readonly lokasiPosId: number;
   readonly onUploaded?: () => void;
 }
 
-export function PhotoUploader({ sesiId, pesertaId, lokasiPosId, onUploaded }: Props) {
+export function PhotoUploader({ quizId, pesertaId, lokasiPosId, onUploaded }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
@@ -57,7 +57,7 @@ export function PhotoUploader({ sesiId, pesertaId, lokasiPosId, onUploaded }: Pr
       const formData = new FormData();
       formData.append('file', file);
       formData.append('peserta_id', String(pesertaId));
-      formData.append('sesi_id', String(sesiId));
+      formData.append('quiz_id', String(quizId));
       formData.append('lokasi_pos_id', String(lokasiPosId));
       if (caption) {
         formData.append('caption', caption);

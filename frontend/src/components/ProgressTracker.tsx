@@ -26,7 +26,7 @@ export function ProgressTracker({ totalPos = 3, completedPos = 0, totalScore = 0
 
       <div className="mb-3">
         <div className="flex items-center justify-between text-xs text-text-muted mb-1">
-          <span>Sesi Diselesaikan</span>
+          <span>Quiz Diselesaikan</span>
           <span>{completedPos}/{totalPos}</span>
         </div>
         <div className="w-full h-3 bg-surface-alt rounded-full overflow-hidden">
@@ -46,7 +46,7 @@ export function ProgressTracker({ totalPos = 3, completedPos = 0, totalScore = 0
         <div className="bg-accent-50 rounded-lg p-3 text-center">
           <Award size={16} className="mx-auto text-accent mb-1" />
           <p className="text-lg font-bold text-accent">{completedPos}</p>
-          <p className="text-xs text-text-muted">Sesi</p>
+          <p className="text-xs text-text-muted">Quiz</p>
         </div>
       </div>
     </div>

@@ -197,55 +197,55 @@ router.post('/:id/peserta', authenticate, authorize('admin'), asyncHandler(async
 }));
 
 /**
- * GET /api/kelompok/:id/quiz - list quiz assigned to kelompok (admin, worker)
+ * GET /api/kelompok/:id/agenda - list agenda assigned to kelompok (admin, worker)
  */
-router.get('/:id/quiz', authenticate, authorize('admin', 'worker'), asyncHandler(async (req, res) => {
+router.get('/:id/agenda', authenticate, authorize('admin', 'worker'), asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   const [kelompokRows] = await pool.execute('SELECT id, nama FROM kelompok WHERE id = ?', [id]);
   if (kelompokRows.length === 0) throw new ApiError(404, 'Kelompok not found');
 
-  const [quizRows] = await pool.execute(
-    `SELECT q.id, q.nama, q.deskripsi, q.status, q.created_at
-     FROM quiz q
-     INNER JOIN quiz_kelompok qk ON q.id = qk.quiz_id
-     WHERE qk.kelompok_id = ?
-     ORDER BY q.id`,
+  const [agendaRows] = await pool.execute(
+    `SELECT a.id, a.nama, a.deskripsi, a.status, a.created_at
+     FROM agenda a
+     INNER JOIN agenda_kelompok ak ON a.id = ak.agenda_id
+     WHERE ak.kelompok_id = ?
+     ORDER BY a.id`,
     [id]
   );
 
-  // Embed each quiz's sesi (with time window + pos) so the per-sesi list can render
+  // Embed each agenda's quiz (with time window + pos) so the per-quiz list can render
   // and its availability can be decided from the schedule instead of a manual toggle.
-  const quizIds = quizRows.map((q) => q.id);
-  let sesiMap = {};
-  if (quizIds.length > 0) {
-    const placeholders = quizIds.map(() => '?').join(',');
-    const [sesiRows] = await pool.execute(
-      `SELECT s.id, s.quiz_id, s.nama, s.tipe, s.status, s.waktu_mulai, s.waktu_selesai,
+  const agendaIds = agendaRows.map((a) => a.id);
+  let quizMap = {};
+  if (agendaIds.length > 0) {
+    const placeholders = agendaIds.map(() => '?').join(',');
+    const [quizRows] = await pool.execute(
+      `SELECT q.id, q.agenda_id, q.nama, q.tipe, q.status, q.waktu_mulai, q.waktu_selesai,
               p.nama AS pos_nama
-       FROM sesi s
-       LEFT JOIN pos p ON s.pos_id = p.id
-       WHERE s.quiz_id IN (${placeholders})
-       ORDER BY s.id`,
-      quizIds
+       FROM quiz q
+       LEFT JOIN pos p ON q.pos_id = p.id
+       WHERE q.agenda_id IN (${placeholders})
+       ORDER BY q.id`,
+      agendaIds
     );
-    sesiRows.forEach((s) => {
-      if (!sesiMap[s.quiz_id]) sesiMap[s.quiz_id] = [];
-      sesiMap[s.quiz_id].push(s);
+    quizRows.forEach((q) => {
+      if (!quizMap[q.agenda_id]) quizMap[q.agenda_id] = [];
+      quizMap[q.agenda_id].push(q);
     });
   }
 
-  const quizWithSesi = quizRows.map((q) => ({
-    ...q,
-    sesi: sesiMap[q.id] || [],
+  const agendaWithQuiz = agendaRows.map((a) => ({
+    ...a,
+    quiz: quizMap[a.id] || [],
   }));
 
   res.json({
     success: true,
     data: {
       kelompok: kelompokRows[0],
-      quiz: quizWithSesi,
-      total: quizWithSesi.length,
+      agenda: agendaWithQuiz,
+      total: agendaWithQuiz.length,
     },
   });
 }));

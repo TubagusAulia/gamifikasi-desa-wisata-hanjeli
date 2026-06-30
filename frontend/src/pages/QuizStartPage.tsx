@@ -13,17 +13,17 @@ export function QuizStartPage() {
     queryFn: () => locationApi.getCurrentQuiz(),
   });
 
-  const sesi = currentQuiz ?? null;
-  const sesiId = sesi?.sesi_id ?? null;
+  const quiz = currentQuiz ?? null;
+  const quizId = quiz?.quiz_id ?? null;
 
   const { data: leaderboard } = useQuery({
-    queryKey: ['leaderboard', 'sesi', sesiId],
-    queryFn: () => leaderboardApi.getSession(sesiId!),
-    enabled: !!sesiId,
+    queryKey: ['leaderboard', 'quiz', quizId],
+    queryFn: () => leaderboardApi.getQuiz(quizId!),
+    enabled: !!quizId,
   });
 
   const handleStart = () => {
-    if (sesiId) navigate(`/quiz/take/${sesiId}`);
+    if (quizId) navigate(`/quiz/take/${quizId}`);
   };
 
   if (isLoading) {
@@ -52,7 +52,7 @@ export function QuizStartPage() {
   }
 
   // No quiz found at current location
-  if (!sesi) {
+  if (!quiz) {
     return (
       <div className="min-h-screen bg-surface-alt">
         <Navbar />
@@ -80,12 +80,12 @@ export function QuizStartPage() {
 
   const parseSessionDate = (value?: string | null) => value ? new Date(value.replace(' ', 'T')) : null;
   const now = new Date();
-  const mulaiDate = parseSessionDate(sesi.waktu_mulai);
-  const selesaiDate = parseSessionDate(sesi.waktu_selesai);
+  const mulaiDate = parseSessionDate(quiz.waktu_mulai);
+  const selesaiDate = parseSessionDate(quiz.waktu_selesai);
   const isExpired = selesaiDate ? selesaiDate < now : false;
   const isUpcoming = mulaiDate ? mulaiDate > now : false;
-  const isActive = sesi.status === 'active' && sesi.is_time_valid && !isExpired && !isUpcoming;
-  const hasSubmitted = sesi.has_submitted === true;
+  const isActive = quiz.status === 'active' && quiz.is_time_valid && !isExpired && !isUpcoming;
+  const hasSubmitted = quiz.has_submitted === true;
 
   const getStatusInfo = (): { label: string; color: string; icon: React.ReactNode } => {
     if (isExpired) {
@@ -94,13 +94,13 @@ export function QuizStartPage() {
     if (isUpcoming) {
       return { label: 'Belum Dimulai', color: 'bg-warning-50 text-warning-dark', icon: <Clock size={14} /> };
     }
-    if (!sesi.is_time_valid) {
+    if (!quiz.is_time_valid) {
       return { label: 'Di Luar Waktu', color: 'bg-warning-50 text-warning-dark', icon: <Clock size={14} /> };
     }
-    if (sesi.status === 'active') {
+    if (quiz.status === 'active') {
       return { label: 'Aktif', color: 'bg-success-50 text-success-dark', icon: <Play size={14} /> };
     }
-    if (sesi.status === 'completed') {
+    if (quiz.status === 'completed') {
       return { label: 'Selesai', color: 'bg-gray-100 text-text-muted', icon: <Clock size={14} /> };
     }
     return { label: 'Nonaktif', color: 'bg-warning-50 text-warning-dark', icon: <Clock size={14} /> };
@@ -126,22 +126,22 @@ export function QuizStartPage() {
               <BookOpen size={28} className="text-secondary" />
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-bold text-text">{sesi.sesi_nama}</h1>
+              <h1 className="text-2xl font-bold text-text">{quiz.quiz_nama}</h1>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full ${statusInfo.color}`}>
                   {statusInfo.icon}
                   {statusInfo.label}
                 </span>
                 <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${
-                  sesi.tipe === 'individu' ? 'bg-secondary-50 text-secondary-dark' : 'bg-accent-50 text-accent-dark'
+                  quiz.tipe === 'individu' ? 'bg-secondary-50 text-secondary-dark' : 'bg-accent-50 text-accent-dark'
                 }`}>
-                  {sesi.tipe === 'individu' ? (
+                  {quiz.tipe === 'individu' ? (
                     <span className="flex items-center gap-1"><BookOpen size={12} /> Individu</span>
                   ) : (
                     <span className="flex items-center gap-1"><Users size={12} /> Kelompok</span>
                   )}
                 </span>
-                {sesi.password && (
+                {quiz.password && (
                   <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-warning-50 text-warning-dark flex items-center gap-1">
                     <Lock size={12} /> Password
                   </span>
@@ -158,7 +158,7 @@ export function QuizStartPage() {
               </div>
               <div>
                 <p className="text-xs text-text-muted">Pos</p>
-                <p className="text-sm font-medium text-text">{sesi.pos_nama}</p>
+                <p className="text-sm font-medium text-text">{quiz.pos_nama}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -168,7 +168,7 @@ export function QuizStartPage() {
               <div>
                 <p className="text-xs text-text-muted">Waktu Mulai</p>
                 <p className="text-sm font-medium text-text">
-                  {sesi.waktu_mulai ? new Date(sesi.waktu_mulai).toLocaleString('id-ID') : '-'}
+                  {quiz.waktu_mulai ? new Date(quiz.waktu_mulai).toLocaleString('id-ID') : '-'}
                 </p>
               </div>
             </div>
@@ -179,7 +179,7 @@ export function QuizStartPage() {
               <div>
                 <p className="text-xs text-text-muted">Waktu Selesai</p>
                 <p className="text-sm font-medium text-text">
-                  {sesi.waktu_selesai ? new Date(sesi.waktu_selesai).toLocaleString('id-ID') : '-'}
+                  {quiz.waktu_selesai ? new Date(quiz.waktu_selesai).toLocaleString('id-ID') : '-'}
                 </p>
               </div>
             </div>
@@ -189,7 +189,7 @@ export function QuizStartPage() {
               </div>
               <div>
                 <p className="text-xs text-text-muted">Jumlah Soal</p>
-                <p className="text-sm font-medium text-text">{sesi.daftar_soal_nama}</p>
+                <p className="text-sm font-medium text-text">{quiz.daftar_soal_nama}</p>
               </div>
             </div>
           </div>

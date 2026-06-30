@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { posApi, agendaApi, locationApi } from '@/services/api';
 import { Navbar } from '@/components/Navbar';
 import { MapPin, Loader2, Navigation, AlertCircle, Locate, PhoneOff, Phone } from 'lucide-react';
-import { isSessionActive } from '@/utils/session';
+import { isQuizActive } from '@/utils/session';
 import type { Pos, Agenda } from '@/types';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -84,16 +84,16 @@ export function PetaPage() {
     queryFn: agendaApi.getAll,
   });
 
-  // Map: pos_id → nearest agenda that has a sesi at this pos, with no_phone_policy info
+  // Map: pos_id → nearest agenda that has a quiz at this pos, with no_phone_policy info
   const posAgendaMap = useCallback(() => {
     const map: Record<number, { agenda: Agenda; hasPhone: boolean }> = {};
     if (!agendaList || !posList) return map;
 
     for (const agenda of agendaList) {
-      if (!agenda.sesi) continue;
-      for (const s of agenda.sesi) {
-        // Find which pos this sesi belongs to
-        const matchingPos = posList.find(p => s.pos_id === p.id);
+      if (!agenda.quiz) continue;
+      for (const q of agenda.quiz) {
+        // Find which pos this quiz belongs to
+        const matchingPos = posList.find(p => q.pos_id === p.id);
         if (matchingPos && !map[matchingPos.id]) {
           // Use the nearest agenda (first one found) for this pos
           map[matchingPos.id] = {
@@ -351,8 +351,8 @@ export function PetaPage() {
                   const isNearby = nearbyPos?.id === pos.id;
                   const agendaInfo = getPosAgendaInfo(pos.id);
                   const posHasPhone = agendaInfo?.hasPhone;
-                  const activeSession = agendaInfo?.agenda?.sesi?.find((s: any) => s.pos_id === pos.id && isSessionActive(s));
-                  const hasActiveSession = Boolean(activeSession);
+                  const activeQuiz = agendaInfo?.agenda?.quiz?.find((q: any) => q.pos_id === pos.id && isQuizActive(q));
+                  const hasActiveSession = Boolean(activeQuiz);
                   const assignedToThisQuiz = isPekerja && agendaInfo?.agenda?.assigned_workers?.some((w: any) => w.id === user?.id);
 
                   // Determine buttons for this pos

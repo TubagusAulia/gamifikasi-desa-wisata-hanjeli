@@ -31,20 +31,4 @@ async function processPhoto(buffer, mimeType) {
   };
 }
 
-/**
- * Mock face detection (Google Vision API fallback).
- * In production, replace with actual Google Vision API call.
- */
-async function detectFace(buffer) {
-  // Mock implementation - always returns true
-  // In production, call Google Vision API:
-  // POST https://vision.googleapis.com/v1/images:annotate
-  // with feature type: FACE_DETECTION
-  return {
-    hasFace: true,
-    confidence: 0.95,
-    faceCount: 1,
-  };
-}
-
-module.exports = { processPhoto, detectFace };
+module.exports = { processPhoto };

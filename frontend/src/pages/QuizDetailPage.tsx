@@ -70,9 +70,9 @@ export function QuizDetailPage() {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Link to="/quiz" className="inline-flex items-center gap-1 text-secondary hover:underline mb-4">
+        <Link to="/agenda" className="inline-flex items-center gap-1 text-secondary hover:underline mb-4">
           <ArrowLeft size={16} />
-          Kembali
+          Kembali ke Daftar Agenda
         </Link>
 
         {isLoading && (

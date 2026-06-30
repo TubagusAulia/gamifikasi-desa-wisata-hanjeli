@@ -12,21 +12,21 @@ const router = express.Router();
  * POST /api/map/pos/create
  */
 router.post('/pos/create', authenticate, authorize('admin'), validate(createPosSchema), asyncHandler(async (req, res) => {
-  const { sesi_id, nama_pos, latitude, longitude, radius_meter, deskripsi } = req.body;
+  const { quiz_id, nama_pos, latitude, longitude, radius_meter, deskripsi } = req.body;
 
-  const [sesiRows] = await pool.execute('SELECT id FROM sesi WHERE id = ?', [sesi_id]);
-  if (sesiRows.length === 0) throw new ApiError(404, 'Session not found');
+  const [quizRows] = await pool.execute('SELECT id FROM quiz WHERE id = ?', [quiz_id]);
+  if (quizRows.length === 0) throw new ApiError(404, 'Session not found');
 
   const [result] = await pool.execute(
-    'INSERT INTO lokasi_pos (sesi_id, nama_pos, latitude, longitude, radius_meter, deskripsi) VALUES (?, ?, ?, ?, ?, ?)',
-    [sesi_id, nama_pos, latitude, longitude, radius_meter || 50, deskripsi || null]
+    'INSERT INTO lokasi_pos (quiz_id, nama_pos, latitude, longitude, radius_meter, deskripsi) VALUES (?, ?, ?, ?, ?, ?)',
+    [quiz_id, nama_pos, latitude, longitude, radius_meter || 50, deskripsi || null]
   );
 
   res.status(201).json({
     success: true,
     data: {
       pos_id: result.insertId,
-      sesi_id: parseInt(sesi_id),
+      quiz_id: parseInt(quiz_id),
       nama_pos,
       latitude,
       longitude,
@@ -38,13 +38,13 @@ router.post('/pos/create', authenticate, authorize('admin'), validate(createPosS
 }));
 
 /**
- * GET /api/map/pos/:sesi_id
+ * GET /api/map/pos/:quiz_id
  */
-router.get('/pos/:sesi_id', asyncHandler(async (req, res) => {
-  const { sesi_id } = req.params;
+router.get('/pos/:quiz_id', asyncHandler(async (req, res) => {
+  const { quiz_id } = req.params;
   const [rows] = await pool.execute(
-    'SELECT id, nama_pos, latitude, longitude, radius_meter, deskripsi FROM lokasi_pos WHERE sesi_id = ? ORDER BY id',
-    [sesi_id]
+    'SELECT id, nama_pos, latitude, longitude, radius_meter, deskripsi FROM lokasi_pos WHERE quiz_id = ? ORDER BY id',
+    [quiz_id]
   );
   const data = rows.map(r => ({ ...r, latitude: parseFloat(r.latitude), longitude: parseFloat(r.longitude) }));
   res.json({ success: true, data });
