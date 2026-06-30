@@ -40,5 +40,11 @@ sonar-project.properties
 .vscode/
 .idea/
 
+# Runtime state / caches
+.cache/
+*.tmp
+*.bak
+*~
+
 # Legacy / scratch dirs
 gamifikasi-frontend_old/
